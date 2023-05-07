@@ -1,20 +1,43 @@
 module ShaderLibrary
 
 using Random: Random, MersenneTwister, AbstractRNG
+using StaticArrays
 using Accessors: @set, setproperties
 using ColorTypes
 using SPIRV: SPIRV, validate, U, F, image_type
 using SPIRV.MathFunctions
-using GeometryExperiments: GeometryExperiments, BezierCurve, Point, Point2, box, PointSet, TriangleList, TriangleStrip
+using GeometryExperiments
 using Lava
 using SPIRV
 using SymbolicGA: @ga
 using OpenType
 using OpenType: curves, curves_normalized, Text, Line
 
+import Lava: RenderTargets, Program, Command, ProgramInvocationData, DrawIndexed
+
 include("utils.jl")
 include("transforms.jl")
+include("shader.jl")
+include("primitive.jl")
+include("invocation.jl")
 
-export PinholeCamera, Rotation, Plane, Transform, project, apply_rotation, apply_transform
+include("library/gradient.jl")
+include("library/rectangle.jl")
+
+export
+  Primitive,
+  Instance,
+
+  ShaderComponent,
+  Rectangle,
+  Gradient,
+
+  PinholeCamera,
+  Rotation,
+  Plane,
+  Transform,
+  project,
+  apply_rotation,
+  apply_transform
 
 end
