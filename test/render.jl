@@ -18,6 +18,16 @@ function save_test_render(filename, data, h::Union{Nothing, UInt} = nothing; tmp
 end
 
 @testset "Rendering" begin
+  @testset "Triangle" begin
+    grad = Gradient(color)
+    vertices = [PosColor((-0.4, -0.4), (1.0, 0.0, 0.0)), PosColor((0.4, -0.4), (0.0, 1.0, 0.0)), PosColor((0.0, 0.6), (0.0, 0.0, 1.0))]
+    primitive = Primitive(TriangleStrip(1:3), FACE_ORIENTATION_COUNTERCLOCKWISE, vertices)
+    command = Command(grad, device, primitive)
+    render(device, command)
+    data = collect(color, device)
+    save_test_render("triangle.png", data, 0x110df7c912f605ab)
+  end
+
   @testset "Rectangle" begin
     grad = Gradient(color)
     rect = Rectangle((0.5, 0.5), (-0.2, -0.2), (1.0, 0.0, 1.0))

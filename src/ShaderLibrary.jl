@@ -25,12 +25,16 @@ include("library/gradient.jl")
 include("library/rectangle.jl")
 
 export
+  TriangleList,
+  TriangleStrip,
+  FACE_ORIENTATION_CLOCKWISE,
+  FACE_ORIENTATION_COUNTERCLOCKWISE,
   Primitive,
   Instance,
 
   ShaderComponent,
+  Gradient, PosColor,
   Rectangle,
-  Gradient,
 
   PinholeCamera,
   Rotation,
