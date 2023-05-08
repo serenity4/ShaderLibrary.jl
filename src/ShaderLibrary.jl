@@ -27,6 +27,7 @@ include("library/rectangle.jl")
 export
   TriangleList,
   TriangleStrip,
+  Vertex, TriangleMesh,
   FACE_ORIENTATION_CLOCKWISE,
   FACE_ORIENTATION_COUNTERCLOCKWISE,
   Primitive,

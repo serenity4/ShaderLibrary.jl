@@ -20,8 +20,8 @@ end
 @testset "Rendering" begin
   @testset "Triangle" begin
     grad = Gradient(color)
-    vertices = [PosColor((-0.4, -0.4), (1.0, 0.0, 0.0)), PosColor((0.4, -0.4), (0.0, 1.0, 0.0)), PosColor((0.0, 0.6), (0.0, 0.0, 1.0))]
-    primitive = Primitive(TriangleStrip(1:3), FACE_ORIENTATION_COUNTERCLOCKWISE, vertices)
+    vertices = [Vertex(Vec2(-0.4, -0.4), Vec3(1.0, 0.0, 0.0)), Vertex(Vec2(0.4, -0.4), Vec3(0.0, 1.0, 0.0)), Vertex(Vec2(0.0, 0.6), Vec3(0.0, 0.0, 1.0))]
+    primitive = Primitive(TriangleStrip(1:3), vertices, FACE_ORIENTATION_COUNTERCLOCKWISE)
     command = Command(grad, device, primitive)
     render(device, command)
     data = collect(color, device)

@@ -1,15 +1,11 @@
-struct PosColor
-  pos::Vec2
-  color::Vec3
-end
-
 struct Gradient <: ShaderComponent
   color::Resource
 end
 
 function gradient_vert(frag_color, position, index, data_address::DeviceAddressBlock)
   data = @load data_address::InvocationData
-  (; pos, color) = @load data.vertex_data[index]::PosColor
+  pos = @load data.vertex_locations[index]::Vec3
+  color = @load data.vertex_data[index]::Vec3
   position[] = Vec4(pos.x, pos.y, 0F, 1F)
   frag_color.rgb = color
   frag_color.a = 1F
@@ -25,4 +21,4 @@ function Program(::Gradient, device)
   Program(vert, frag)
 end
 
-interface(::Gradient) = Tuple{PosColor,Nothing,Nothing,Nothing}
+interface(::Gradient) = Tuple{Vec3,Nothing,Nothing,Nothing}
