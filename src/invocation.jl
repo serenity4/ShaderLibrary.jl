@@ -14,8 +14,7 @@ ProgramInvocationData(shader::ShaderComponent, prog, primitive::Primitive) = Pro
 ProgramInvocationData(shader::ShaderComponent, prog, primitives::AbstractVector{<:Primitive}) = ProgramInvocationData(shader, prog, Instance(primitives))
 
 function ProgramInvocationData(shader::ShaderComponent, prog, instances::AbstractVector{<:Instance{IT,PT,VT}}) where {IT,PT,VT}
-  data = user_data(shader)
-  Tuple{VT,PT,IT,typeof(data)} <: interface(shader) || throw(ArgumentError("The provided instances do not respect the interface declared by $shader: ($VT,$PT,$IT,$(typeof(data))) ≠ $((interface(shader).parameters...,))"))
+  Tuple{VT,PT,IT} <: interface(shader) || throw(ArgumentError("The provided instances do not respect the interface declared by $shader: ($VT,$PT,$IT) ≠ $((interface(shader).parameters...,))"))
   vertex_data, primitive_data, instance_data = data_container.((VT, PT, IT))
   vertex_locations = Vec3[]
   for instance in instances
@@ -34,6 +33,7 @@ function ProgramInvocationData(shader::ShaderComponent, prog, instances::Abstrac
     vdata = VT === Nothing ? DeviceAddress(0) : @address(@block vertex_data)
     pdata = PT === Nothing ? DeviceAddress(0) : @address(@block primitive_data)
     idata = IT === Nothing ? DeviceAddress(0) : @address(@block instance_data)
+    data = user_data(shader, __context__)
     udata = isnothing(data) ? DeviceAddress(0) : @address(@block data)
     @block InvocationData(vlocs, vdata, pdata, idata, udata)
   end

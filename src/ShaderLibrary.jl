@@ -23,6 +23,7 @@ include("invocation.jl")
 
 include("library/gradient.jl")
 include("library/rectangle.jl")
+include("library/sprite.jl")
 
 export
   TriangleList,
@@ -36,6 +37,7 @@ export
   ShaderComponent,
   Gradient, PosColor,
   Rectangle,
+  Sprite,
 
   PinholeCamera,
   Rotation,

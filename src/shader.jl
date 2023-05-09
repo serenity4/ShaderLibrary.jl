@@ -8,7 +8,7 @@ A type of `Nothing` indicates the absence of value.
 """
 function interface end
 
-user_data(::ShaderComponent) = nothing
+user_data(::ShaderComponent, ctx) = nothing
 
 RenderTargets(shader::ShaderComponent) = RenderTargets(shader.color)
 
@@ -27,4 +27,6 @@ function Command(shader::ShaderComponent, device, geometry, prog = Program(shade
   )
 end
 
-resource_dependencies(shader::ShaderComponent) = @resource_dependencies @write (shader.color => (0.08, 0.05, 0.1, 1.0))::Color
+const CLEAR_VALUE = (0.08, 0.05, 0.1, 1.0)
+
+resource_dependencies(shader::ShaderComponent) = @resource_dependencies @write (shader.color => CLEAR_VALUE)::Color
