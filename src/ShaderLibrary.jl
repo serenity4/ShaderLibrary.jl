@@ -24,6 +24,7 @@ include("invocation.jl")
 include("library/gradient.jl")
 include("library/rectangle.jl")
 include("library/sprite.jl")
+include("library/blur.jl")
 include("library/quadratic_bezier_fill.jl")
 
 export
@@ -40,6 +41,7 @@ export
   Rectangle,
   Sprite,
   QuadraticBezierFill, QuadraticBezierPrimitiveData,
+  GaussianBlur,
 
   PinholeCamera,
   Rotation,
