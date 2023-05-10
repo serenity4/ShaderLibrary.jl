@@ -42,7 +42,7 @@
   end
 
   @testset "Blur" begin
-    texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT)
+    texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT, name = :normal_map)
     vertices = [Vertex(Vec2(-0.4, -0.4), Vec2(0.0, 0.0)), Vertex(Vec2(0.4, -0.4), Vec2(1.0, 0.0)), Vertex(Vec2(0.0, 0.6), Vec2(0.5, 1.0))]
     primitive = Primitive(TriangleStrip(1:3), vertices, FACE_ORIENTATION_COUNTERCLOCKWISE)
 
@@ -56,9 +56,9 @@
     data = collect(color, device)
     save_test_render("blurred_triangle_vertical.png", data, 0xe66d87a2eea86345)
 
-    blur = GaussianBlur(color, texture, 0.01)
+    blur = GaussianBlur(color, texture, 0.02)
     render(device, blur, primitive)
     data = collect(color, device)
-    save_test_render("blurred_triangle.png", data)
+    save_test_render("blurred_triangle.png", data, 0xfe6aee023252a9b6)
   end
 end;

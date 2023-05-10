@@ -69,11 +69,21 @@ end
 GaussianBlur(color, image::Resource, size = 0.01) = GaussianBlur(color, default_texture(image), size)
 
 function renderables(blur::GaussianBlur, device, geometry, prog = nothing)
-  transient_color = similar(blur.color; usage_flags = Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
+  transient_color = similar(blur.color; usage_flags = Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT, name = :transient_color)
+
+  # First, blur the whole texture once, then blur only the relevant portion.
   blur_x = GaussianBlurDirectional(transient_color, blur.texture, BLUR_HORIZONTAL, blur.size)
-  transient_image = Resource(similar(transient_color.attachment.view.image; usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_SAMPLED_BIT))
+  rect = Rectangle((1.0, 1.0), (0.0, 0.0), 0.5F .* (Ref(one(Vec2)) .+ Vec2.(PointSet(HyperCube{2}, Point2).points)), nothing)
+
+  transient_image = Resource(similar(transient_color.attachment.view.image; usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_SAMPLED_BIT), :transient_image)
   transfer = transfer_command(transient_color, transient_image)
+
   blur_y = GaussianBlurDirectional(blur.color, transient_image, BLUR_VERTICAL, blur.size)
   prog = @something(prog, Program(blur_x, device))
-  (RenderNode(Command(blur_x, device, geometry, prog)), RenderNode(transfer), RenderNode(Command(blur_y, device, geometry, prog)))
+
+  (
+    RenderNode(Command(blur_x, device, Primitive(rect), prog), :directional_blur_x),
+    RenderNode(transfer, :transfer),
+    RenderNode(Command(blur_y, device, geometry, prog), :directional_blur_y),
+  )
 end
