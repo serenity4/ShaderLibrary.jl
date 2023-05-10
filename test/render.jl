@@ -59,6 +59,6 @@
     blur = GaussianBlur(color, texture, 0.01)
     render(device, blur, primitive)
     data = collect(color, device)
-    save_test_render("blurred_triangle.png", data, 0x67b92c7515f9f507)
+    save_test_render("blurred_triangle.png", data)
   end
 end;

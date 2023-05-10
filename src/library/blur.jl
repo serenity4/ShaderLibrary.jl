@@ -68,52 +68,12 @@ struct GaussianBlur <: ShaderComponent
 end
 GaussianBlur(color, image::Resource, size = 0.01) = GaussianBlur(color, default_texture(image), size)
 
-gaussian_2d((x, y), size) = gaussian_1d(x, size) * gaussian_1d(y, size)
-
-"""
-Naive but slow implementation, with quadratic complexity in the size of the image.
-
-A natural improvement would make use of the fact that `gaussian_2d((x, y), size) = gaussian_1d(x, size) * gaussian_1d(y, size)`
-only needs N + M gaussian kernel evaluations instead of N*M evaluations as done currently.
-"""
-function gaussian_blur(σ, reference, uv)
-  res = zero(Vec3)
-  imsize = size(SPIRV.Image(reference), 0U)
-  pixel_size = 1F ./ imsize # size of one pixel in UV coordinates.
-  rx, ry = Int32.(min.(ceil.(3σ .* imsize), imsize))
-  for i in -rx:rx
-    for j in -ry:ry
-      uv_offset = Vec2(i, j) .* pixel_size
-      weight = gaussian_2d(uv_offset, σ) * 0.5(pixel_size[1]^2 + pixel_size[2]^2)
-      sampled = reference(uv + uv_offset)
-      color = sampled.rgb
-      res .+= color * weight
-    end
-  end
-  res
+function renderables(blur::GaussianBlur, device, geometry, prog = nothing)
+  transient_color = similar(blur.color; usage_flags = Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
+  blur_x = GaussianBlurDirectional(transient_color, blur.texture, BLUR_HORIZONTAL, blur.size)
+  transient_image = Resource(similar(transient_color.attachment.view.image; usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_SAMPLED_BIT))
+  transfer = transfer_command(transient_color, transient_image)
+  blur_y = GaussianBlurDirectional(blur.color, transient_image, BLUR_VERTICAL, blur.size)
+  prog = @something(prog, Program(blur_x, device))
+  (RenderNode(Command(blur_x, device, geometry, prog)), RenderNode(transfer), RenderNode(Command(blur_y, device, geometry, prog)))
 end
-
-function blur_frag(out_color, uv, data_address, textures)
-  data = @load data_address::InvocationData
-  size, texture_index = @load data.user_data::Tuple{Float32, DescriptorIndex}
-  reference = textures[texture_index]
-  out_color.rgb = gaussian_blur(size, reference, uv)
-  out_color.a = 1F
-end
-
-function Program(blur::GaussianBlur, device)
-  vert = @vertex device sprite_vert(::Vec2::Output, ::Vec4::Output{Position}, ::UInt32::Input{VertexIndex}, ::DeviceAddressBlock::PushConstant)
-  frag = @fragment device blur_frag(
-    ::Vec4::Output,
-    ::Vec2::Input,
-    ::DeviceAddressBlock::PushConstant,
-    ::Arr{2048,SPIRV.SampledImage{image_type(SPIRV.ImageFormatRgba16f, SPIRV.Dim2D, 0, false, false, 1)}}::UniformConstant{@DescriptorSet(0), @Binding(3)})
-  Program(vert, frag)
-end
-
-user_data(blur::GaussianBlur, ctx) = (blur.size, DescriptorIndex(texture_descriptor(blur.texture), ctx))
-resource_dependencies(blur::GaussianBlur) = @resource_dependencies begin
-  @read blur.texture.image::Texture
-  @write (blur.color => CLEAR_VALUE)::Color
-end
-interface(::GaussianBlur) = Tuple{Vec2,Nothing,Nothing}
