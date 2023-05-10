@@ -6,7 +6,7 @@ struct Primitive{PT,VT,M<:TriangleMesh{<:Any,VT}}
   data::PT
 end
 
-Primitive(encoding::IndexEncoding, vertices, orientation, transform = Transform()) = Primitive(TriangleMesh(encoding, vertices), orientation, transform, nothing)
+Primitive(encoding::IndexEncoding, vertices, orientation, transform = Transform(), data = nothing) = Primitive(TriangleMesh(encoding, vertices), orientation, transform, data)
 
 struct Instance{IT,PT,VT,P<:Primitive{PT,VT},V<:AbstractVector{P}}
   primitives::V

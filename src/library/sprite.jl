@@ -2,9 +2,7 @@ struct Sprite <: ShaderComponent
   color::Resource
   texture::Texture
 end
-
-Sprite(color, image::Resource) = Sprite(color, Texture(image, setproperties(DEFAULT_SAMPLING, (magnification = Vk.FILTER_LINEAR, minification = Vk.FILTER_LINEAR))))
-Sprite(color, texture::Texture) = Sprite(color, texture)
+Sprite(color, image::Resource) = Sprite(color, default_texture(image))
 
 function sprite_vert(uv, position, index, data_address::DeviceAddressBlock)
   data = @load data_address::InvocationData

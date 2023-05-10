@@ -24,6 +24,7 @@ include("invocation.jl")
 include("library/gradient.jl")
 include("library/rectangle.jl")
 include("library/sprite.jl")
+include("library/quadratic_bezier_fill.jl")
 
 export
   TriangleList,
@@ -38,6 +39,7 @@ export
   Gradient, PosColor,
   Rectangle,
   Sprite,
+  QuadraticBezierFill, QuadraticBezierPrimitiveData,
 
   PinholeCamera,
   Rotation,
@@ -45,6 +47,7 @@ export
   Transform,
   project,
   apply_rotation,
-  apply_transform
+  apply_transform,
+  remap
 
 end

@@ -1,5 +1,6 @@
 render_file(filename; tmp = false) = joinpath(@__DIR__, "renders", tmp ? "tmp" : "", filename)
 texture_file(filename) = joinpath(@__DIR__, "textures", filename)
+font_file(filename) = joinpath(@__DIR__, "fonts", filename)
 read_texture(filename) = convert(Matrix{RGBA{Float16}}, load(texture_file("normal.png")))
 
 function save_render(filename, data; tmp = false)
@@ -42,7 +43,7 @@ end
 
   @testset "Rectangle" begin
     grad = Gradient(color)
-    rect = Rectangle((0.5, 0.5), (-0.2, -0.2), (1.0, 0.0, 1.0))
+    rect = Rectangle((0.5, 0.5), (-0.2, -0.2), fill(Vec3(1.0, 0.0, 1.0), 4), nothing)
     primitive = Primitive(rect)
     command = Command(grad, device, primitive)
     render(device, command)
@@ -59,5 +60,19 @@ end
     render(device, command)
     data = collect(color, device)
     save_test_render("sprite_triangle.png", data, 0x97a071b6cedb5bba)
+  end
+
+  @testset "Glyph rendering" begin
+    font = OpenTypeFont(font_file("juliamono-regular.ttf"));
+    glyph = font['A']
+    curves = map(x -> Arr{3,Vec2}(Vec2.(broadcast.(remap, x, 0.0, 1.0, -0.9, 0.9))), OpenType.curves_normalized(glyph))
+    qbf = QuadraticBezierFill(color, curves)
+    data = QuadraticBezierPrimitiveData(eachindex(curves) .- 1, 3.6, Vec3(0.6, 0.4, 1.0))
+    rect = Rectangle((1.0, 1.0), (0.0, 0.0), nothing, data)
+    primitive = Primitive(rect)
+    command = Command(qbf, device, primitive)
+    render(device, command)
+    data = collect(color, device)
+    save_test_render("glyph.png", data, 0x090b3ae40da4d980)
   end
 end;

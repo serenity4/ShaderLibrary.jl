@@ -1,9 +1,10 @@
 using ShaderLibrary
+using Test
 using Lava
 using Accessors: @set
 using SPIRV.MathFunctions
 using SPIRV: @compile, validate, F, U, Vec3, Vec2, unwrap
-using Test
+using OpenType
 using FileIO: load, save
 
 instance, device = init(; with_validation = true)

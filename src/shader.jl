@@ -30,3 +30,5 @@ end
 const CLEAR_VALUE = (0.08, 0.05, 0.1, 1.0)
 
 resource_dependencies(shader::ShaderComponent) = @resource_dependencies @write (shader.color => CLEAR_VALUE)::Color
+
+default_texture(image::Resource) = Texture(image, setproperties(DEFAULT_SAMPLING, (magnification = Vk.FILTER_LINEAR, minification = Vk.FILTER_LINEAR)))
