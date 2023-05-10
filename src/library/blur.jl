@@ -10,6 +10,12 @@ function gaussian_1d(t, σ)
 end
 gaussian_2d((x, y), σ) = gaussian_1d(x, σ) * gaussian_1d(y, σ)
 
+"""
+Naive but slow implementation, with quadratic complexity in the size of the image.
+
+A natural improvement would make use of the fact that `gaussian_2d((x, y), σ) = gaussian_1d(x, σ) * gaussian_1d(y, σ)`
+only needs N + M gaussian kernel evaluations instead of N*M evaluations as done currently.
+"""
 function gaussian_blur(σ, reference, uv)
   res = zero(Vec3)
   imsize = size(SPIRV.Image(reference), 0U)
