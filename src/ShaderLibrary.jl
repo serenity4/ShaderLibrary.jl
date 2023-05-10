@@ -15,7 +15,6 @@ using OpenType: curves, curves_normalized, Text, Line
 
 import Lava: RenderTargets, Program, Command, ProgramInvocationData, DrawIndexed
 
-include("utils.jl")
 include("transforms.jl")
 include("shader.jl")
 include("primitive.jl")
