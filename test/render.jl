@@ -22,12 +22,12 @@
   @testset "Sprites" begin
     texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT)
     sprite = Sprite(color, texture)
-    vertices = [Vertex(Vec2(-0.4, -0.4), Vec2(0.0, 0.0)), Vertex(Vec2(0.4, -0.4), Vec2(0.5, 1.0)), Vertex(Vec2(0.0, 0.6), Vec2(1.0, 0.0))]
+    vertices = [Vertex(Vec2(-0.4, -0.4), Vec2(0.0, 0.0)), Vertex(Vec2(0.4, -0.4), Vec2(1.0, 0.0)), Vertex(Vec2(0.0, 0.6), Vec2(0.5, 1.0))]
     primitive = Primitive(TriangleStrip(1:3), vertices, FACE_ORIENTATION_COUNTERCLOCKWISE)
     command = Command(sprite, device, primitive)
     render(device, command)
     data = collect(color, device)
-    save_test_render("sprite_triangle.png", data, 0x97a071b6cedb5bba)
+    save_test_render("sprite_triangle.png", data, 0xf16897b4c86bc05b)
   end
 
   @testset "Glyph rendering" begin
@@ -46,12 +46,25 @@
 
   @testset "Blur" begin
     texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT)
-    blur = GaussianBlur(color, texture, 0.01)
-    vertices = [Vertex(Vec2(-0.4, -0.4), Vec2(0.0, 0.0)), Vertex(Vec2(0.4, -0.4), Vec2(0.5, 1.0)), Vertex(Vec2(0.0, 0.6), Vec2(1.0, 0.0))]
+    vertices = [Vertex(Vec2(-0.4, -0.4), Vec2(0.0, 0.0)), Vertex(Vec2(0.4, -0.4), Vec2(1.0, 0.0)), Vertex(Vec2(0.0, 0.6), Vec2(0.5, 1.0))]
     primitive = Primitive(TriangleStrip(1:3), vertices, FACE_ORIENTATION_COUNTERCLOCKWISE)
+
+    directional_blur = GaussianBlurDirectional(color, texture, BLUR_HORIZONTAL, 0.02)
+    command = Command(directional_blur, device, primitive)
+    render(device, command)
+    data = collect(color, device)
+    save_test_render("blurred_triangle_horizontal.png", data, 0xe2b7ec249d4bbcdb)
+
+    directional_blur = GaussianBlurDirectional(color, texture, BLUR_VERTICAL, 0.02)
+    command = Command(directional_blur, device, primitive)
+    render(device, command)
+    data = collect(color, device)
+    save_test_render("blurred_triangle_vertical.png", data, 0xe66d87a2eea86345)
+
+    blur = GaussianBlur(color, texture, 0.01)
     command = Command(blur, device, primitive)
     render(device, command)
     data = collect(color, device)
-    save_test_render("blurred_triangle.png", data, 0x0b0306da555a5f20)
+    save_test_render("blurred_triangle.png", data, 0x67b92c7515f9f507)
   end
 end;

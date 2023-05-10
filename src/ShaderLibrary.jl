@@ -40,6 +40,7 @@ export
   Rectangle,
   Sprite,
   QuadraticBezierFill, QuadraticBezierPrimitiveData,
+  GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL,
   GaussianBlur,
 
   PinholeCamera,
