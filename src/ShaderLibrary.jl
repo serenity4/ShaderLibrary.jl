@@ -16,8 +16,8 @@ using OpenType: curves, curves_normalized, Text, Line
 import Lava: RenderTargets, Program, Command, ProgramInvocationData, DrawIndexed, render
 
 include("transforms.jl")
-include("shader.jl")
 include("primitive.jl")
+include("shader.jl")
 include("invocation.jl")
 
 include("library/gradient.jl")

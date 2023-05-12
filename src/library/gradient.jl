@@ -1,4 +1,4 @@
-struct Gradient <: ShaderComponent
+struct Gradient <: GraphicsShaderComponent
   color::Resource
 end
 

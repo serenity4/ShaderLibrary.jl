@@ -10,11 +10,11 @@ end
 data_container(::Type{Nothing}) = nothing
 data_container(::Type{T}) where {T} = T[]
 
-ProgramInvocationData(shader::ShaderComponent, prog, instance::Instance) = ProgramInvocationData(shader, prog, SA[instance])
-ProgramInvocationData(shader::ShaderComponent, prog, primitive::Primitive) = ProgramInvocationData(shader, prog, SA[primitive])
-ProgramInvocationData(shader::ShaderComponent, prog, primitives::AbstractVector{<:Primitive}) = ProgramInvocationData(shader, prog, Instance(primitives))
+ProgramInvocationData(shader::GraphicsShaderComponent, prog, instance::Instance) = ProgramInvocationData(shader, prog, SA[instance])
+ProgramInvocationData(shader::GraphicsShaderComponent, prog, primitive::Primitive) = ProgramInvocationData(shader, prog, SA[primitive])
+ProgramInvocationData(shader::GraphicsShaderComponent, prog, primitives::AbstractVector{<:Primitive}) = ProgramInvocationData(shader, prog, Instance(primitives))
 
-function ProgramInvocationData(shader::ShaderComponent, prog, instances::AbstractVector{<:Instance{IT,PT,VT}}) where {IT,PT,VT}
+function ProgramInvocationData(shader::GraphicsShaderComponent, prog, instances::AbstractVector{<:Instance{IT,PT,VT}}) where {IT,PT,VT}
   Tuple{VT,PT,IT} <: interface(shader) || throw(ArgumentError("The provided instances do not respect the interface declared by $shader: ($VT,$PT,$IT) ≠ $((interface(shader).parameters...,))"))
   vertex_data, primitive_data, instance_data = data_container.((VT, PT, IT))
   vertex_locations = Vec3[]

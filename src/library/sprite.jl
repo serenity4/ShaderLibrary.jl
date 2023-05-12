@@ -1,4 +1,4 @@
-struct Sprite <: ShaderComponent
+struct Sprite <: GraphicsShaderComponent
   color::Resource
   texture::Texture
 end

@@ -1,7 +1,7 @@
 const BLUR_HORIZONTAL = 0
 const BLUR_VERTICAL = 1
 
-struct GaussianBlurDirectional <: ShaderComponent
+struct GaussianBlurDirectional <: GraphicsShaderComponent
   color::Resource
   texture::Texture
   direction::UInt32
@@ -61,7 +61,7 @@ resource_dependencies(blur::GaussianBlurDirectional) = @resource_dependencies be
 end
 interface(::GaussianBlurDirectional) = Tuple{Vec2,Nothing,Nothing}
 
-struct GaussianBlur <: ShaderComponent
+struct GaussianBlur <: GraphicsShaderComponent
   color::Resource
   texture::Texture
   size::Float32
