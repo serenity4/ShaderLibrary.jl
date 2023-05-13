@@ -58,20 +58,20 @@ struct QuadraticBezierPrimitiveData
   color::Vec3
 end
 
-function quadratic_bezier_fill_vert(position, frag_position, frag_primitive_index, index, data_address)
+function quadratic_bezier_fill_vert(position, frag_coordinates, frag_primitive_index, index, data_address)
   data = @load data_address::InvocationData
   pos = @load data.vertex_locations[index]::Vec3
   position[] = Vec(pos.x, pos.y, 0F, 1F)
-  frag_position[] = position.xy
+  frag_coordinates[] = @load data.vertex_data[index]::Vec2
   frag_primitive_index.x = @load data.primitive_indices[index]::UInt32
 end
 
-function quadratic_bezier_fill_frag(out_color, position, primitive_index, data_address)
+function quadratic_bezier_fill_frag(out_color, coordinates, primitive_index, data_address)
   data = @load data_address::InvocationData
   curves = data.user_data # Vector{Arr{3,Vec2}}
   (; color, range, sharpness) = @load data.primitive_data[primitive_index.x]::QuadraticBezierPrimitiveData
   out_color.rgb = color
-  out_color.a = clamp(intensity(position, curves, range, 10sharpness), 0F, 1F)
+  out_color.a = clamp(intensity(coordinates, curves, range, 10sharpness), 0F, 1F)
 end
 
 function Program(::QuadraticBezierFill, device)
@@ -80,5 +80,5 @@ function Program(::QuadraticBezierFill, device)
   Program(vert, frag)
 end
 
-interface(::QuadraticBezierFill) = Tuple{Nothing,QuadraticBezierPrimitiveData,Nothing}
+interface(::QuadraticBezierFill) = Tuple{Vec2,QuadraticBezierPrimitiveData,Nothing}
 user_data(qbf::QuadraticBezierFill, ctx) = qbf.curves

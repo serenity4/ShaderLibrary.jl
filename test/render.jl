@@ -6,16 +6,16 @@
     command = Command(grad, device, primitive)
     render(device, command)
     data = collect(color, device)
-    save_test_render("triangle.png", data, 0x110df7c912f605ab)
+    save_test_render("triangle.png", data)
   end
 
   @testset "Rectangle" begin
     grad = Gradient(color)
-    rect = Rectangle((0.5, 0.5), (-0.2, -0.2), fill(Vec3(1.0, 0.0, 1.0), 4), nothing)
+    rect = Rectangle((0.5, 0.5), (-0.4, -0.4), fill(Vec3(1.0, 0.0, 1.0), 4), nothing) # actually a square
     primitive = Primitive(rect)
     render(device, grad, primitive)
     data = collect(color, device)
-    save_test_render("rectangle.png", data, 0x3ddf0e2dbe8ebfdb)
+    save_test_render("rectangle.png", data, 0xe0c150b540769d0b)
   end
 
   @testset "Sprites" begin
@@ -25,20 +25,21 @@
     primitive = Primitive(TriangleStrip(1:3), vertices, FACE_ORIENTATION_COUNTERCLOCKWISE)
     render(device, sprite, primitive)
     data = collect(color, device)
-    save_test_render("sprite_triangle.png", data, 0xf16897b4c86bc05b)
+    save_test_render("sprite_triangle.png", data, 0x231cf3602440b50c)
   end
 
   @testset "Glyph rendering" begin
     font = OpenTypeFont(font_file("juliamono-regular.ttf"));
     glyph = font['A']
-    curves = map(x -> Arr{3,Vec2}(Vec2.(broadcast.(remap, x, 0.0, 1.0, -0.9, 0.9))), OpenType.curves_normalized(glyph))
+    curves = map(x -> Arr{3,Vec2}(Vec2.(x)), OpenType.curves_normalized(glyph))
     qbf = QuadraticBezierFill(color, curves)
     data = QuadraticBezierPrimitiveData(eachindex(curves) .- 1, 3.6, Vec3(0.6, 0.4, 1.0))
-    rect = Rectangle((1.0, 1.0), (0.0, 0.0), nothing, data)
+    coordinates = Vec2[(0, 0), (1, 0), (0, 1), (1, 1)]
+    rect = Rectangle((0.5, 0.5), (0.0, 0.0), coordinates, data)
     primitive = Primitive(rect)
     render(device, qbf, primitive)
     data = collect(color, device)
-    save_test_render("glyph.png", data, 0x090b3ae40da4d980)
+    save_test_render("glyph.png", data, 0x07c306609d809f4a)
   end
 
   @testset "Blur" begin
@@ -49,16 +50,17 @@
     directional_blur = GaussianBlurDirectional(color, texture, BLUR_HORIZONTAL, 0.02)
     render(device, directional_blur, primitive)
     data = collect(color, device)
-    save_test_render("blurred_triangle_horizontal.png", data, 0xe2b7ec249d4bbcdb)
+    save_test_render("blurred_triangle_horizontal.png", data, 0x41c9e4d0f035ba4d)
 
     directional_blur = GaussianBlurDirectional(color, texture, BLUR_VERTICAL, 0.02)
     render(device, directional_blur, primitive)
     data = collect(color, device)
-    save_test_render("blurred_triangle_vertical.png", data, 0xe66d87a2eea86345)
+    save_test_render("blurred_triangle_vertical.png", data, 0xdbbcc39255604205)
 
+    # Need to specify dimensions of the whole texture for the first pass.
     blur = GaussianBlur(color, texture, 0.02)
     render(device, blur, primitive)
     data = collect(color, device)
-    save_test_render("blurred_triangle.png", data, 0xfe6aee023252a9b6)
+    save_test_render("blurred_triangle.png", data)
   end
 end;
