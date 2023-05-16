@@ -11,7 +11,7 @@ using Lava
 using SPIRV
 using SymbolicGA: @ga
 using OpenType
-using OpenType: curves, curves_normalized, Text, Line
+using OpenType: curves, curves_normalized, Line
 
 import Lava: RenderTargets, Program, Command, ProgramInvocationData, DrawIndexed, render
 
@@ -25,6 +25,7 @@ include("library/rectangle.jl")
 include("library/sprite.jl")
 include("library/blur.jl")
 include("library/quadratic_bezier_fill.jl")
+include("library/text.jl")
 
 export
   TriangleList,

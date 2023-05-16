@@ -63,4 +63,26 @@
     data = collect(color, device)
     save_test_render("blurred_triangle.png", data)
   end
+
+  @testset "Text rendering" begin
+    font = OpenTypeFont(font_file("juliamono-regular.ttf"));
+    options = FontOptions(ShapingOptions(tag"latn", tag"fra "), 1/10)
+    text = OpenType.Text("The brown fox jumps over the lazy dog.", TextOptions())
+    line = only(lines(text, [font => options]))
+    segment = only(line.segments)
+    (; quads, curves) = glyph_quads(line, segment, (0, 0))
+    @test length(quads) == count(!isspace, text.chars)
+    @test length(unique(rect.data.range for rect in quads)) == count(x -> !isnothing(font[x]), unique(line.glyphs))
+
+    render(device, Text(color, text), font, options, (-1, 0))
+    data = collect(color, device)
+    save_test_render("text.png", data)
+
+    font = OpenTypeFont(font_file("NotoSerifLao.ttf"));
+    options = FontOptions(ShapingOptions(tag"lao ", tag"dflt"; enabled_features = Set([tag"aalt"])), 1/10)
+    text = OpenType.Text("ກີບ ສົ \ue99\ueb5\uec9", TextOptions())
+    render(device, Text(color, text), font, options, (-1, 0))
+    data = collect(color, device)
+    save_test_render("text_lao.png", data)
+  end
 end;

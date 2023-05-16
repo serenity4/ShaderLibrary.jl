@@ -30,12 +30,26 @@ function Vk.PrimitiveTopology(primitive::Primitive)
   error("Unknown primitive topology for index encoding type $E")
 end
 
-Vk.FrontFace(primitives::AbstractVector{Primitive}) = Vk.FrontFace(primitives[begin])
+Vk.FrontFace(primitives::AbstractVector{<:Primitive}) = Vk.FrontFace(primitives[begin])
 Vk.FrontFace(instance::Instance) = Vk.FrontFace(instance.primitives)
-Vk.FrontFace(instances::AbstractVector{Instance}) = Vk.FrontFace(instances[begin])
+Vk.FrontFace(instances::AbstractVector{<:Instance}) = Vk.FrontFace(instances[begin])
 
-Vk.PrimitiveTopology(primitives::AbstractVector{Primitive}) = Vk.PrimitiveTopology(primitives[begin])
+Vk.PrimitiveTopology(primitives::AbstractVector{<:Primitive}) = Vk.PrimitiveTopology(primitives[begin])
 Vk.PrimitiveTopology(instance::Instance) = Vk.PrimitiveTopology(instance.primitives)
-Vk.PrimitiveTopology(instances::AbstractVector{Instance}) = Vk.PrimitiveTopology(instances[begin])
+Vk.PrimitiveTopology(instances::AbstractVector{<:Instance}) = Vk.PrimitiveTopology(instances[begin])
 
-DrawIndexed(primitive::Primitive) = DrawIndexed(foldl(append!, primitive.mesh.indices.indices; init = UInt32[]))
+vertex_indices(primitive::Primitive) = foldl(append!, primitive.mesh.indices.indices; init = UInt32[])
+function vertex_indices(primitives::AbstractVector{<:Primitive})
+  indices = UInt32[]
+  offset = 0U
+  for primitive in primitives
+    primitive_indices = vertex_indices(primitive)
+    for index in primitive_indices
+      push!(indices, index + offset)
+    end
+    offset += maximum(primitive_indices)
+  end
+  indices
+end
+DrawIndexed(primitive::Primitive) = DrawIndexed(vertex_indices(primitive))
+DrawIndexed(primitives::AbstractVector{<:Primitive}) = DrawIndexed(vertex_indices(primitives))

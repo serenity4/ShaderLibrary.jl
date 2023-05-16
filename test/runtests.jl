@@ -1,4 +1,5 @@
 using ShaderLibrary
+using ShaderLibrary: glyph_quads, Text
 using Test
 using Lava
 using Accessors: @set
