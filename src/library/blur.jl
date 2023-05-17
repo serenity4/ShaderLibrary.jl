@@ -44,7 +44,7 @@ function gaussian_blur_directional_frag(out_color, uv, data_address, textures)
   out_color.a = 1F + 0F
 end
 
-function Program(blur::GaussianBlurDirectional, device)
+function Program(::Type{GaussianBlurDirectional}, device)
   vert = @vertex device sprite_vert(::Vec2::Output, ::Vec4::Output{Position}, ::UInt32::Input{VertexIndex}, ::DeviceAddressBlock::PushConstant)
   frag = @fragment device gaussian_blur_directional_frag(
     ::Vec4::Output,
@@ -68,7 +68,7 @@ struct GaussianBlur <: GraphicsShaderComponent
 end
 GaussianBlur(color, image::Resource, size = 0.01) = GaussianBlur(color, default_texture(image), size)
 
-function renderables(blur::GaussianBlur, device, geometry, prog = nothing)
+function renderables(cache::ProgramCache, blur::GaussianBlur, device, geometry)
   transient_color = similar(blur.color; usage_flags = Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT, name = :transient_color)
 
   # First, blur the whole texture once, then blur only the relevant portion.
@@ -79,11 +79,10 @@ function renderables(blur::GaussianBlur, device, geometry, prog = nothing)
   transfer = transfer_command(transient_color, transient_image)
 
   blur_y = GaussianBlurDirectional(blur.color, transient_image, BLUR_VERTICAL, blur.size)
-  prog = @something(prog, Program(blur_x, device))
 
   (
-    RenderNode(Command(blur_x, device, Primitive(rect), prog), :directional_blur_x),
+    RenderNode(Command(cache, blur_x, device, Primitive(rect)), :directional_blur_x),
     RenderNode(transfer, :transfer),
-    RenderNode(Command(blur_y, device, geometry, prog), :directional_blur_y),
+    RenderNode(Command(cache, blur_y, device, geometry), :directional_blur_y),
   )
 end

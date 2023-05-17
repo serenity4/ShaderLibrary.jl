@@ -15,7 +15,7 @@ function gradient_frag(color, frag_color)
   color[] = frag_color
 end
 
-function Program(::Gradient, device)
+function Program(::Type{Gradient}, device)
   vert = @vertex device gradient_vert(::Vec4::Output, ::Vec4::Output{Position}, ::UInt32::Input{VertexIndex}, ::DeviceAddressBlock::PushConstant)
   frag = @fragment device gradient_frag(::Vec4::Output, ::Vec4::Input)
   Program(vert, frag)

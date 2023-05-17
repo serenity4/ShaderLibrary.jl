@@ -18,7 +18,7 @@ function sprite_frag(out_color, uv, data_address, textures)
   out_color.a = 1F
 end
 
-function Program(::Sprite, device)
+function Program(::Type{Sprite}, device)
   vert = @vertex device sprite_vert(::Vec2::Output, ::Vec4::Output{Position}, ::UInt32::Input{VertexIndex}, ::DeviceAddressBlock::PushConstant)
   frag = @fragment device sprite_frag(
     ::Vec4::Output,

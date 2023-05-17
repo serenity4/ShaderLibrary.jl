@@ -74,7 +74,7 @@ function quadratic_bezier_fill_frag(out_color, coordinates, primitive_index, dat
   out_color.a = clamp(intensity(coordinates, curves, range, 10sharpness), 0F, 1F)
 end
 
-function Program(::QuadraticBezierFill, device)
+function Program(::Type{QuadraticBezierFill}, device)
   vert = @vertex device quadratic_bezier_fill_vert(::Vec4::Output{Position}, ::Vec2::Output, ::Vec{2,UInt32}::Output, ::UInt32::Input{VertexIndex}, ::DeviceAddressBlock::PushConstant)
   frag = @fragment device quadratic_bezier_fill_frag(::Vec4::Output, ::Vec2::Input, ::Vec{2,UInt32}::Input{@Flat}, ::DeviceAddressBlock::PushConstant)
   Program(vert, frag)
