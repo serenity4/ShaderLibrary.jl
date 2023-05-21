@@ -18,8 +18,8 @@ Base.empty!(cache::ProgramCache) = empty!(cache.programs)
 
 user_data(::ShaderComponent, ctx) = nothing
 
-renderables(cache::ProgramCache, shader::ShaderComponent, device, geometry, args...) = Command(cache, shader, device, geometry, args...)
-renderables(shader::ShaderComponent, device, args...) = renderables(ProgramCache(device), shader, device, args...)
+renderables(cache::ProgramCache, shader::ShaderComponent, geometry, args...) = Command(cache, shader, geometry, args...)
+renderables(shader::ShaderComponent, device, args...) = renderables(ProgramCache(device), shader, args...)
 render(device, shader::ShaderComponent, geometry, args...) = render(device, renderables(shader, device, geometry, args...))
 
 default_texture(image::Resource) = Texture(image, setproperties(DEFAULT_SAMPLING, (magnification = Vk.FILTER_LINEAR, minification = Vk.FILTER_LINEAR)))
@@ -31,7 +31,7 @@ color_attachment(shader::GraphicsShaderComponent) = shader.color
 reference_attachment(shader::GraphicsShaderComponent) = color_attachment(shader)
 RenderTargets(shader::GraphicsShaderComponent) = RenderTargets(color_attachments(shader))
 
-function Command(cache::ProgramCache, shader::GraphicsShaderComponent, device, geometry)
+function Command(cache::ProgramCache, shader::GraphicsShaderComponent, geometry)
   prog = get!(cache, typeof(shader))
   graphics_command(
     DrawIndexed(geometry),
@@ -46,7 +46,7 @@ function Command(cache::ProgramCache, shader::GraphicsShaderComponent, device, g
     resource_dependencies(shader),
   )
 end
-Command(shader::GraphicsShaderComponent, device, args...) = Command(ProgramCache(device), shader, device, args...)
+Command(shader::GraphicsShaderComponent, device, args...) = Command(ProgramCache(device), shader, args...)
 
 const CLEAR_VALUE = (0.08, 0.05, 0.1, 1.0)
 

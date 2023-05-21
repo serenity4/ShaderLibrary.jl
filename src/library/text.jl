@@ -3,12 +3,12 @@ struct Text <: GraphicsShaderComponent
   data::OpenType.Text
 end
 
-function renderables(cache::ProgramCache, text::Text, device, font, options, location)
+function renderables(cache::ProgramCache, text::Text, font, options, location)
   line = only(lines(text.data, [font => options]))
   segment = only(line.segments)
   (; quads, curves) = glyph_quads(line, segment, location)
   qbf = QuadraticBezierFill(text.color, curves)
-  renderables(cache, qbf, device, quads)
+  renderables(cache, qbf, quads)
 end
 
 function glyph_quads(line::Line, segment::LineSegment, pen_position)
