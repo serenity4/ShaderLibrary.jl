@@ -39,7 +39,7 @@
     primitive = Primitive(rect)
     render(device, qbf, primitive)
     data = collect(color, device)
-    save_test_render("glyph.png", data, 0x07c306609d809f4a)
+    save_test_render("glyph.png", data, 0xc3d62747ac33c5af)
   end
 
   @testset "Blur" begin
@@ -83,6 +83,6 @@
     text = OpenType.Text("ກີບ ສົ \ue99\ueb5\uec9", TextOptions())
     render(device, Text(color, text), font, options, (-1, 0))
     data = collect(color, device)
-    save_test_render("text_lao.png", data)
+    save_test_render("text_lao.png", data, 0xa943dc8cae349055)
   end
 end;
