@@ -20,7 +20,6 @@ user_data(::ShaderComponent, ctx) = nothing
 
 renderables(cache::ProgramCache, shader::ShaderComponent, geometry, args...) = Command(cache, shader, geometry, args...)
 renderables(shader::ShaderComponent, device, args...) = renderables(ProgramCache(device), shader, args...)
-render(device, shader::ShaderComponent, geometry, args...) = render(device, renderables(shader, device, geometry, args...))
 
 default_texture(image::Resource) = Texture(image, setproperties(DEFAULT_SAMPLING, (magnification = Vk.FILTER_LINEAR, minification = Vk.FILTER_LINEAR)))
 
@@ -46,8 +45,30 @@ function Command(cache::ProgramCache, shader::GraphicsShaderComponent, geometry)
     resource_dependencies(shader),
   )
 end
-Command(shader::GraphicsShaderComponent, device, args...) = Command(ProgramCache(device), shader, args...)
+Command(shader::ShaderComponent, device, args...) = Command(ProgramCache(device), shader, args...)
 
 const CLEAR_VALUE = (0.08, 0.05, 0.1, 1.0)
 
 resource_dependencies(shader::GraphicsShaderComponent) = @resource_dependencies @write (shader.color => CLEAR_VALUE)::Color
+
+abstract type ComputeShaderComponent <: ShaderComponent end
+
+function Command(cache::ProgramCache, shader::ComputeShaderComponent, invocations)
+  prog = get!(cache, typeof(shader))
+  compute_command(
+    Dispatch(invocations...),
+    prog,
+    ProgramInvocationData(shader, prog),
+    resource_dependencies(shader),
+  )
+end
+
+linearize_index((x, y, z), (nx, ny, nz)) = x + y * nx + z * nx * ny
+function linearize_index(global_id, global_size, local_id, local_size)
+  linearize_index(local_id, local_size) + prod(local_size) * linearize_index(global_id, global_size)
+end
+
+image_index(linear_index, (ni, nj)) = (linear_index % ni, linear_index ÷ ni)
+
+render(device, shader::GraphicsShaderComponent, geometry, args...) = render(device, renderables(shader, device, geometry, args...))
+compute(device, shader::ComputeShaderComponent, args...) = compute(device, renderables(shader, device, args...))

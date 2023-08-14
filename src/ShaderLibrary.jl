@@ -12,6 +12,8 @@ using SPIRV
 using SymbolicGA: @ga
 using OpenType
 using OpenType: curves, curves_normalized, Line
+using Erosion
+using Erosion: ErosionMaps
 
 import Lava: RenderTargets, Program, Command, ProgramInvocationData, DrawIndexed, render
 
@@ -26,6 +28,7 @@ include("library/sprite.jl")
 include("library/blur.jl")
 include("library/quadratic_bezier_fill.jl")
 include("library/text.jl")
+include("library/erosion.jl")
 
 export
   TriangleList,
@@ -36,14 +39,16 @@ export
   Primitive,
   Instance,
 
-  ShaderComponent,
+  ShaderComponent, GraphicsShaderComponent, ComputeShaderComponent,
   Gradient, PosColor,
   Rectangle,
   Sprite,
   QuadraticBezierFill, QuadraticBezierPrimitiveData,
   GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL,
   GaussianBlur,
+  LargeScaleErosion,
   ProgramCache,
+  render, compute,
 
   PinholeCamera,
   Rotation,

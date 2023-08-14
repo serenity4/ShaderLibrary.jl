@@ -5,6 +5,7 @@ using Lava
 using Accessors: @set
 using SPIRV.MathFunctions
 using SPIRV: @compile, validate, F, U, Vec3, Vec2, unwrap
+using Erosion
 using OpenType
 using FileIO: load, save
 
@@ -15,4 +16,5 @@ include("utils.jl")
 @testset "ShaderLibrary.jl" begin
     include("transforms.jl")
     include("render.jl")
+    include("compute.jl")
 end;
