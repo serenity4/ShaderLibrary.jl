@@ -71,7 +71,7 @@ function Program(::Type{S}, device) where {T,M,S<:LargeScaleErosion{T,M}}
     ::Vec{3,UInt32}::Input{LocalInvocationId},
     ::Vec{3,UInt32}::Input{WorkgroupId},
     ::Type{M},
-  ) ComputeExecutionOptions(local_size = workgroup_size(S))
+  ) options = ComputeExecutionOptions(local_size = workgroup_size(S))
   Program(compute)
 end
 
