@@ -48,7 +48,7 @@ export
   GaussianBlur,
   LargeScaleErosion,
   ProgramCache,
-  render, compute,
+  renderables, render, compute,
 
   PinholeCamera,
   Rotation,
