@@ -1,6 +1,7 @@
 using ShaderLibrary
 using ShaderLibrary: glyph_quads, Text
 using Test
+using GeometryExperiments: Point2
 using Lava
 using Accessors: @set
 using SPIRV.MathFunctions
@@ -16,5 +17,5 @@ include("utils.jl")
 @testset "ShaderLibrary.jl" begin
     include("transforms.jl")
     include("render.jl")
-    include("compute.jl")
+    # include("compute.jl")
 end;

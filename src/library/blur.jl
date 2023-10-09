@@ -73,7 +73,7 @@ function renderables(cache::ProgramCache, blur::GaussianBlur, geometry)
 
   # First, blur the whole texture once, then blur only the relevant portion.
   blur_x = GaussianBlurDirectional(transient_color, blur.texture, BLUR_HORIZONTAL, blur.size)
-  rect = Rectangle((1.0, 1.0), (0.0, 0.0), 0.5F .* (Ref(one(Vec2)) .+ Vec2.(PointSet(HyperCube{2}, Point2).points)), nothing)
+  rect = Rectangle(Point(1.0, 1.0), Point(0.0, 0.0), 0.5F .* (Ref(one(Vec2)) .+ Vec2.(PointSet(HyperCube{2}, Point2).points)), nothing)
 
   transient_image = Resource(similar(transient_color.attachment.view.image; usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_SAMPLED_BIT), :transient_image)
   transfer = transfer_command(transient_color, transient_image)

@@ -11,7 +11,7 @@
 
   @testset "Rectangle" begin
     grad = Gradient(color)
-    rect = Rectangle((0.5, 0.5), (-0.4, -0.4), fill(Vec3(1.0, 0.0, 1.0), 4), nothing) # actually a square
+    rect = Rectangle(Point2(0.5, 0.5), Point2(-0.4, -0.4), fill(Vec3(1.0, 0.0, 1.0), 4), nothing) # actually a square
     primitive = Primitive(rect)
     render(device, grad, primitive)
     data = collect(color, device)
@@ -35,7 +35,7 @@
     qbf = QuadraticBezierFill(color, curves)
     data = QuadraticBezierPrimitiveData(eachindex(curves) .- 1, 3.6, Vec3(0.6, 0.4, 1.0))
     coordinates = Vec2[(0, 0), (1, 0), (0, 1), (1, 1)]
-    rect = Rectangle((0.5, 0.5), (0.0, 0.0), coordinates, data)
+    rect = Rectangle(Point2(0.5, 0.5), Point2(0.0, 0.0), coordinates, data)
     primitive = Primitive(rect)
     render(device, qbf, primitive)
     data = collect(color, device)

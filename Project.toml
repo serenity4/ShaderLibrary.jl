@@ -17,7 +17,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 SymbolicGA = "be1275fb-6550-422f-8b88-a5943ccecfb8"
 
 [compat]
-GeometryExperiments = "0.3"
+GeometryExperiments = "0.4"
 julia = "1.9"
 
 [extras]
