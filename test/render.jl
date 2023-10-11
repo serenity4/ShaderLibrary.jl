@@ -70,9 +70,9 @@
     text = OpenType.Text("The brown fox jumps over the lazy dog.", TextOptions())
     line = only(lines(text, [font => options]))
     segment = only(line.segments)
-    (; quads, curves) = glyph_quads(line, segment, (0, 0))
+    (; quads, curves) = glyph_quads(line, segment)
     @test length(quads) == count(!isspace, text.chars)
-    @test length(unique(rect.data.range for rect in quads)) == count(x -> !isnothing(font[x]), unique(line.glyphs))
+    @test length(unique(rect.data.range for rect in quads)) == length(line.outlines)
 
     render(device, Text(color, text), font, options, (-1, 0))
     data = collect(color, device)
