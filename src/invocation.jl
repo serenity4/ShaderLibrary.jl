@@ -55,7 +55,11 @@ aspect_ratio(r::Resource) = aspect_ratio(dimensions(r.attachment))
 aspect_ratio(dims) = dims[1] / dims[2]
 aspect_ratio(::Nothing) = error("Dimensions must be specified for the reference attachment.")
 
+point3(x::Point{2}) = Point{3,eltype(x)}(x..., 1)
+point3(x::Point{3}) = x
+
 vec3(x::Vec3) = x
 vec3(x) = convert(Vec3, x)
 vec3(x::Vec{2}) = Vec3(x..., 1)
-vec3(x::SVector{2}) = Vec3(x..., 1)
+vec3(x::Point{2}) = Vec3(x..., 1)
+vec3(x::Point{3}) = Vec3(x...)
