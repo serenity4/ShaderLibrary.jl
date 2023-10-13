@@ -43,3 +43,5 @@ function glyph_quads(line::Line, segment::LineSegment, origin::Point{3})
   end
   (; quads = Primitive.(quads), curves)
 end
+
+boundingelement(text::Text) = boundingelement(text.data, [text.font => text.options])

@@ -15,6 +15,7 @@ using OpenType: curves, curves_normalized, Line
 using Erosion
 using Erosion: ErosionMaps
 
+import GeometryExperiments: boundingelement
 import Lava: RenderTargets, Program, Command, ProgramInvocationData, DrawIndexed, render
 
 include("transforms.jl")
