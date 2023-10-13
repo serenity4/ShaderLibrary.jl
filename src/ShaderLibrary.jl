@@ -15,6 +15,8 @@ using OpenType: curves, curves_normalized, Line
 using Erosion
 using Erosion: ErosionMaps
 
+const Optional{T} = Union{T, Nothing}
+
 import GeometryExperiments: boundingelement
 import Lava: RenderTargets, Program, Command, ProgramInvocationData, DrawIndexed, render
 
@@ -41,7 +43,7 @@ export
   Instance,
 
   ShaderComponent, GraphicsShaderComponent, ComputeShaderComponent,
-  ShaderParameters,
+  ShaderParameters, ClearValue,
   Gradient, PosColor,
   Rectangle,
   Sprite,

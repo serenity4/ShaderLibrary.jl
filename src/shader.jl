@@ -9,12 +9,19 @@ A type of `Nothing` indicates the absence of value.
 function interface end
 
 struct ShaderParameters
-  targets::RenderTargets
+  color::Vector{Resource}
+  color_clear::Vector{Optional{ClearValue}}
+  depth::Optional{Resource}
+  depth_clear::Optional{ClearValue}
+  stencil::Optional{Resource}
+  stencil_clear::Optional{ClearValue}
   render_state::RenderState
   invocation_state::ProgramInvocationState
 end
 
-ShaderParameters(color...; depth = nothing, stencil = nothing, render_state = RenderState(), invocation_state = ProgramInvocationState()) = ShaderParameters(RenderTargets(color...; depth, stencil), render_state, invocation_state)
+ShaderParameters(color...; color_clear = [DEFAULT_CLEAR_VALUE for _ in 1:length(color)], depth = nothing, depth_clear = nothing, stencil = nothing, stencil_clear = nothing, render_state = RenderState(), invocation_state = ProgramInvocationState()) = ShaderParameters(collect(color), color_clear, depth, depth_clear, stencil, stencil_clear, render_state, invocation_state)
+
+RenderTargets(parameters::ShaderParameters) = RenderTargets(parameters.color, parameters.depth, parameters.stencil)
 
 struct ProgramCache
   device::Device
@@ -33,27 +40,27 @@ default_texture(image::Resource) = Texture(image, setproperties(DEFAULT_SAMPLING
 
 abstract type GraphicsShaderComponent <: ShaderComponent end
 
-reference_attachment(parameters::ShaderParameters) = parameters.targets.color[1]
+reference_attachment(parameters::ShaderParameters) = parameters.color[1]
 
 function resource_dependencies(shader::GraphicsShaderComponent, parameters::ShaderParameters)
-  (; color, depth, stencil) = parameters.targets
+  (; color, color_clear, depth, depth_clear, stencil, stencil_clear) = parameters
   dependencies = resource_dependencies(shader)
-  for attachment in color
-    insert!(dependencies, attachment, ResourceDependency(RESOURCE_USAGE_COLOR_ATTACHMENT, WRITE, CLEAR_VALUE, nothing))
+  for (attachment, clear) in zip(color, color_clear)
+    insert!(dependencies, attachment, ResourceDependency(RESOURCE_USAGE_COLOR_ATTACHMENT, WRITE, clear, nothing))
   end
-  !isnothing(depth) && insert!(dependencies, depth, ResourceDependency(RESOURCE_USAGE_DEPTH_ATTACHMENT, READ | WRITE))
-  !isnothing(depth) && insert!(dependencies, stencil, ResourceDependency(RESOURCE_USAGE_STENCIL_ATTACHMENT, READ))
+  !isnothing(depth) && insert!(dependencies, depth, ResourceDependency(RESOURCE_USAGE_DEPTH_ATTACHMENT, READ | WRITE, depth_clear, nothing))
+  !isnothing(stencil) && insert!(dependencies, stencil, ResourceDependency(RESOURCE_USAGE_STENCIL_ATTACHMENT, READ, stencil_clear, nothing))
   dependencies
 end
 
 function Command(cache::ProgramCache, shader::GraphicsShaderComponent, parameters::ShaderParameters, geometry)
-  !isempty(parameters.targets.color) || throw(ArgumentError("At least one color attachment must be provided."))
+  !isempty(parameters.color) || throw(ArgumentError("At least one color attachment must be provided."))
   prog = get!(cache, typeof(shader))
   graphics_command(
     DrawIndexed(geometry),
     prog,
     ProgramInvocationData(shader, parameters, prog, geometry),
-    parameters.targets,
+    RenderTargets(parameters),
     parameters.render_state,
     setproperties(parameters.invocation_state, (;
       primitive_topology = Vk.PrimitiveTopology(geometry),
@@ -64,7 +71,7 @@ function Command(cache::ProgramCache, shader::GraphicsShaderComponent, parameter
 end
 Command(shader::ShaderComponent, parameters::ShaderParameters, device, args...) = Command(ProgramCache(device), shader, parameters, args...)
 
-const CLEAR_VALUE = (0.08, 0.05, 0.1, 1.0)
+const DEFAULT_CLEAR_VALUE = ClearValue((0.08, 0.05, 0.1, 1.0))
 
 resource_dependencies(shader::GraphicsShaderComponent) = Lava.Dictionary{Resource,ResourceDependency}()
 
