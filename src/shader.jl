@@ -87,5 +87,5 @@ end
 
 image_index(linear_index, (ni, nj)) = (linear_index % ni, linear_index ÷ ni)
 
-render(device, shader::GraphicsShaderComponent, parameters::ShaderParameters, geometry, args...) = render(device, renderables(shader, parameters, device, geometry, args...))
+render(device, shader::GraphicsShaderComponent, parameters::ShaderParameters, args...) = render(device, renderables(shader, parameters, device, args...))
 compute(device, shader::ComputeShaderComponent, parameters::ShaderParameters, args...) = compute(device, renderables(shader, parameters, device, args...))

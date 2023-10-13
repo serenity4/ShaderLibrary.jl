@@ -1,18 +1,19 @@
 struct Text <: GraphicsShaderComponent
   data::OpenType.Text
+  font::OpenTypeFont
+  options::FontOptions
 end
 
-function renderables(cache::ProgramCache, text::Text, parameters::ShaderParameters, font, options, origin = (0, 0))
-  line = only(lines(text.data, [font => options]))
+function renderables(cache::ProgramCache, text::Text, parameters::ShaderParameters, location)
+  location = point3(convert(Point, location))
+  line = only(lines(text.data, [text.font => text.options]))
   segment = only(line.segments)
-  (; quads, curves) = glyph_quads(line, segment, origin)
+  (; quads, curves) = glyph_quads(line, segment, location)
   qbf = QuadraticBezierFill(curves)
   renderables(cache, qbf, parameters, quads)
 end
 
-glyph_quads(line::Line, segment::LineSegment, origin) = glyph_quads(line, segment, convert(Point, origin))
-glyph_quads(line::Line, segment::LineSegment, origin::Point{2}) = glyph_quads(line, segment, (origin..., 0.0))
-function glyph_quads(line::Line, segment::LineSegment, origin::Point{3} = zero(Point3f))
+function glyph_quads(line::Line, segment::LineSegment, origin::Point{3})
   quads = Rectangle{Vec2,QuadraticBezierPrimitiveData,Vector{Vec2}}[]
   curves = Arr{3,Vec2}[]
   processed_glyphs = Dict{Int64,UnitRange{Int64}}() # to glyph range

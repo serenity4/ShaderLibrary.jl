@@ -1,7 +1,7 @@
 using ShaderLibrary
 using ShaderLibrary: glyph_quads, Text
 using Test
-using GeometryExperiments: Point2
+using GeometryExperiments: Point2, Point3f
 using Lava
 using Accessors: @set
 using SPIRV.MathFunctions
