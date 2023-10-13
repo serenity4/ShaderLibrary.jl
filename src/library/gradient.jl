@@ -1,12 +1,10 @@
-struct Gradient <: GraphicsShaderComponent
-  color::Resource
-end
+struct Gradient <: GraphicsShaderComponent end
 
 function gradient_vert(frag_color, position, index, data_address::DeviceAddressBlock)
   data = @load data_address::InvocationData
   pos = @load data.vertex_locations[index]::Vec3
   color = @load data.vertex_data[index]::Vec3
-  position[] = Vec4(pos.x, pos.y, 0F, 1F)
+  position[] = Vec4(pos.x, pos.y, pos.z, 1F)
   frag_color.rgb = color
   frag_color.a = 1F
 end

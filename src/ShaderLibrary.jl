@@ -40,6 +40,7 @@ export
   Instance,
 
   ShaderComponent, GraphicsShaderComponent, ComputeShaderComponent,
+  ShaderParameters,
   Gradient, PosColor,
   Rectangle,
   Sprite,

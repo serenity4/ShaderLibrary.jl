@@ -10,16 +10,16 @@ end
 data_container(::Type{Nothing}) = nothing
 data_container(::Type{T}) where {T} = T[]
 
-ProgramInvocationData(shader::GraphicsShaderComponent, prog, instance::Instance) = ProgramInvocationData(shader, prog, SA[instance])
-ProgramInvocationData(shader::GraphicsShaderComponent, prog, primitive::Primitive) = ProgramInvocationData(shader, prog, SA[primitive])
-ProgramInvocationData(shader::GraphicsShaderComponent, prog, primitives::AbstractVector{<:Primitive}) = ProgramInvocationData(shader, prog, Instance(primitives))
+ProgramInvocationData(shader::GraphicsShaderComponent, parameters, prog, instance::Instance) = ProgramInvocationData(shader, parameters, prog, SA[instance])
+ProgramInvocationData(shader::GraphicsShaderComponent, parameters, prog, primitive::Primitive) = ProgramInvocationData(shader, parameters, prog, SA[primitive])
+ProgramInvocationData(shader::GraphicsShaderComponent, parameters, prog, primitives::AbstractVector{<:Primitive}) = ProgramInvocationData(shader, parameters, prog, Instance(primitives))
 
-function ProgramInvocationData(shader::GraphicsShaderComponent, prog, instances::AbstractVector{<:Instance{IT,PT,VT}}) where {IT,PT,VT}
+function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::ShaderParameters, prog, instances::AbstractVector{<:Instance{IT,PT,VT}}) where {IT,PT,VT}
   Tuple{VT,PT,IT} <: interface(shader) || throw(ArgumentError("The provided instances do not respect the interface declared by $shader: ($VT,$PT,$IT) ≠ $((interface(shader).parameters...,))"))
   vertex_data, primitive_data, instance_data = data_container.((VT, PT, IT))
   vertex_locations = Vec3[]
   primitive_indices = UInt32[]
-  ar = Float32(aspect_ratio(reference_attachment(shader)))
+  ar = Float32(aspect_ratio(reference_attachment(parameters)))
   for instance in instances
     for (i, primitive) in enumerate(instance.primitives)
       for vertex in vertices(primitive.mesh)
@@ -60,6 +60,6 @@ point3(x::Point{3}) = x
 
 vec3(x::Vec3) = x
 vec3(x) = convert(Vec3, x)
-vec3(x::Vec{2}) = Vec3(x..., 1)
-vec3(x::Point{2}) = Vec3(x..., 1)
+vec3(x::Vec{2}) = Vec3(x..., 0)
+vec3(x::Point{2}) = Vec3(x..., 0)
 vec3(x::Point{3}) = Vec3(x...)

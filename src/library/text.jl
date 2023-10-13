@@ -1,17 +1,18 @@
 struct Text <: GraphicsShaderComponent
-  color::Resource
   data::OpenType.Text
 end
 
-function renderables(cache::ProgramCache, text::Text, font, options, origin = (0, 0))
+function renderables(cache::ProgramCache, text::Text, parameters::ShaderParameters, font, options, origin = (0, 0))
   line = only(lines(text.data, [font => options]))
   segment = only(line.segments)
   (; quads, curves) = glyph_quads(line, segment, origin)
-  qbf = QuadraticBezierFill(text.color, curves)
-  renderables(cache, qbf, quads)
+  qbf = QuadraticBezierFill(curves)
+  renderables(cache, qbf, parameters, quads)
 end
 
-function glyph_quads(line::Line, segment::LineSegment, origin = (0, 0))
+glyph_quads(line::Line, segment::LineSegment, origin) = glyph_quads(line, segment, convert(Point, origin))
+glyph_quads(line::Line, segment::LineSegment, origin::Point{2}) = glyph_quads(line, segment, (origin..., 0.0))
+function glyph_quads(line::Line, segment::LineSegment, origin::Point{3} = zero(Point3f))
   quads = Rectangle{Vec2,QuadraticBezierPrimitiveData,Vector{Vec2}}[]
   curves = Arr{3,Vec2}[]
   processed_glyphs = Dict{Int64,UnitRange{Int64}}() # to glyph range
@@ -37,7 +38,7 @@ function glyph_quads(line::Line, segment::LineSegment, origin = (0, 0))
     end
 
     quad_data = QuadraticBezierPrimitiveData(range .- 1, 20options.font_size.value, color)
-    push!(quads, Rectangle(box, position .+ origin, vertex_data, quad_data))
+    push!(quads, Rectangle(box, Point3f(position..., 0.0) + origin, vertex_data, quad_data))
   end
   (; quads = Primitive.(quads), curves)
 end

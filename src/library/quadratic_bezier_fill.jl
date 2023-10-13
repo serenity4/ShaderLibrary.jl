@@ -47,7 +47,6 @@ function intensity(position, curves::DeviceAddress, range, pixel_per_em)
 end
 
 struct QuadraticBezierFill <: GraphicsShaderComponent
-  color::Resource
   curves::Vector{Arr{3,Vec2}}
 end
 
@@ -60,7 +59,7 @@ end
 function quadratic_bezier_fill_vert(position, frag_coordinates, frag_primitive_index, index, data_address)
   data = @load data_address::InvocationData
   pos = @load data.vertex_locations[index]::Vec3
-  position[] = Vec(pos.x, pos.y, 0F, 1F)
+  position[] = Vec4(pos.x, pos.y, pos.z, 1F)
   frag_coordinates[] = @load data.vertex_data[index]::Vec2
   frag_primitive_index.x = @load data.primitive_indices[index]::UInt32
 end

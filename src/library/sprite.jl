@@ -1,13 +1,12 @@
 struct Sprite <: GraphicsShaderComponent
-  color::Resource
   texture::Texture
 end
-Sprite(color, image::Resource) = Sprite(color, default_texture(image))
+Sprite(image::Resource) = Sprite(default_texture(image))
 
 function sprite_vert(uv, position, index, data_address::DeviceAddressBlock)
   data = @load data_address::InvocationData
   pos = @load data.vertex_locations[index]::Vec3
-  position[] = Vec(pos.x, pos.y, 0F, 1F)
+  position[] = Vec(pos.x, pos.y, pos.z, 1F)
   uv[] = @load data.vertex_data[index]::Vec2
 end
 
@@ -32,5 +31,4 @@ interface(::Sprite) = Tuple{Vec2,Nothing,Nothing}
 user_data(sprite::Sprite, ctx) = DescriptorIndex(texture_descriptor(sprite.texture), ctx)
 resource_dependencies(sprite::Sprite) = @resource_dependencies begin
   @read sprite.texture.image::Texture
-  @write (sprite.color => CLEAR_VALUE)::Color
 end
