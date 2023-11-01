@@ -1,10 +1,11 @@
-struct InvocationData
+@struct_hash_equal struct InvocationData
   vertex_locations::DeviceAddress # Vector{Vec3} indexed by VertexIndex
   vertex_data::DeviceAddress # optional vector indexed by VertexIndex
   primitive_data::DeviceAddress # optional vector indexed by primitive index
   primitive_indices::DeviceAddress # primitive index by vertex index
   instance_data::DeviceAddress # optional vector indexed by InstanceIndex
   user_data::DeviceAddress # user-defined data
+  camera::Camera # provided as a shader parameter
 end
 
 data_container(::Type{Nothing}) = nothing
@@ -42,7 +43,7 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
     idata = IT === Nothing ? DeviceAddress(0) : @address(@block instance_data)
     data = user_data(shader, __context__)
     udata = isnothing(data) ? DeviceAddress(0) : @address(@block data)
-    @block InvocationData(vlocs, vdata, pdata, pinds, idata, udata)
+    @block InvocationData(vlocs, vdata, pdata, pinds, idata, udata, parameters.camera)
   end
 end
 

@@ -14,6 +14,7 @@ OpenType = "e5a4412f-5132-4ec5-841c-0d067f41fa94"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SPIRV = "84138a67-b342-4d33-8200-33cfcca52eb2"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+StructEquality = "6ec83bb0-ed9f-11e9-3b4c-2b04cb4e219c"
 SymbolicGA = "be1275fb-6550-422f-8b88-a5943ccecfb8"
 
 [compat]

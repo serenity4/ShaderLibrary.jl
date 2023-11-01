@@ -6,6 +6,7 @@ Sprite(image::Resource) = Sprite(default_texture(image))
 function sprite_vert(uv, position, index, data_address::DeviceAddressBlock)
   data = @load data_address::InvocationData
   pos = @load data.vertex_locations[index]::Vec3
+  pos = project(pos, data.camera)
   position[] = Vec(pos.x, pos.y, pos.z, 1F)
   uv[] = @load data.vertex_data[index]::Vec2
 end

@@ -14,6 +14,7 @@ using OpenType
 using OpenType: curves, curves_normalized, Line
 using Erosion
 using Erosion: ErosionMaps
+using StructEquality: @struct_hash_equal, @struct_hash_equal_isapprox
 
 const Optional{T} = Union{T, Nothing}
 
@@ -57,7 +58,7 @@ export
   ProgramCache,
   renderables, render, compute,
 
-  PinholeCamera,
+  Camera,
   Rotation,
   Plane,
   Transform,

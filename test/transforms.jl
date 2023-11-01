@@ -28,7 +28,7 @@
 
   @testset "Camera" begin
     f = 0.35
-    camera = PinholeCamera(f, 0, 10, Transform())
+    camera = Camera(f, 0, 10, Transform())
     p = Vec3(0.4, 0.5, 1.7)
     p′ = project(p, camera)
     @test camera.near_clipping_plane < p′.z < camera.far_clipping_plane
@@ -37,6 +37,6 @@
     p.z = camera.far_clipping_plane
     @test project(p, camera).z == 1
 
-    @test unwrap(validate(@compile project(::Vec3, ::PinholeCamera)))
+    @test unwrap(validate(@compile project(::Vec3, ::Camera)))
   end
-end
+end;

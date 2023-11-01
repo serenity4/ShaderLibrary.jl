@@ -17,9 +17,10 @@ struct ShaderParameters
   stencil_clear::Optional{ClearValue}
   render_state::RenderState
   invocation_state::ProgramInvocationState
+  camera::Camera
 end
 
-ShaderParameters(color...; color_clear = [DEFAULT_CLEAR_VALUE for _ in 1:length(color)], depth = nothing, depth_clear = nothing, stencil = nothing, stencil_clear = nothing, render_state = RenderState(), invocation_state = ProgramInvocationState()) = ShaderParameters(collect(color), color_clear, depth, depth_clear, stencil, stencil_clear, render_state, invocation_state)
+ShaderParameters(color...; color_clear = [DEFAULT_CLEAR_VALUE for _ in 1:length(color)], depth = nothing, depth_clear = nothing, stencil = nothing, stencil_clear = nothing, render_state = RenderState(), invocation_state = ProgramInvocationState(), camera = Camera()) = ShaderParameters(collect(color), color_clear, depth, depth_clear, stencil, stencil_clear, render_state, invocation_state, camera)
 
 RenderTargets(parameters::ShaderParameters) = RenderTargets(parameters.color, parameters.depth, parameters.stencil)
 

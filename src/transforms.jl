@@ -1,11 +1,8 @@
-struct Plane
+@struct_hash_equal_isapprox struct Plane
   u::Vec3
   v::Vec3
   Plane(u, v) = new(normalize(convert(Vec3, u)), normalize(convert(Vec3, v)))
 end
-
-Base.:(==)(x::Plane, y::Plane) = x.u == y.u && x.v == y.v
-Base.isapprox(x::Plane, y::Plane) = x.u ≈ y.u && x.v ≈ y.v
 
 Plane(normal) = Plane(convert(Vec3, normal))
 function Plane(normal::Vec3)
@@ -16,7 +13,7 @@ function Plane(normal::Vec3)
   Plane(u, v)
 end
 
-struct Rotation
+@struct_hash_equal_isapprox struct Rotation
   plane::Plane
   angle::Float32
 end
@@ -38,7 +35,7 @@ function apply_rotation(p::Vec3, rotation::Rotation)
   end
 end
 
-Base.@kwdef struct Transform
+@struct_hash_equal_isapprox Base.@kwdef struct Transform
   translation::Vec3 = (0, 0, 0)
   rotation::Rotation = Rotation()
   scaling::Vec3 = (1, 1, 1)
@@ -51,6 +48,10 @@ end
 Base.inv((; translation, rotation, scaling)::Transform) = Transform(-translation, inv(rotation), inv.(scaling))
 
 """
+Pinhole camera with a hole that is infinitely small.
+
+Does not produce blur, which may make it appear somewhat unrealistic; the image is perfectly sharp. This behavior is the same as used in most 3D engines/games.
+
 The image plane is taken to be z = 0.
 The optical center is placed a z = focal_length.
 
@@ -59,14 +60,14 @@ or near the camera the point was. The resulting value is between 0 and 1,
 where 0 corresponds to a point on the near clipping plane, and 1 to one on
 the far clipping plane.
 """
-Base.@kwdef struct PinholeCamera
-  focal_length::Float32 = 0.35
+@struct_hash_equal_isapprox Base.@kwdef struct Camera
+  focal_length::Float32 = 1.0
   near_clipping_plane::Float32 = 0
-  far_clipping_plane::Float32 = 10
+  far_clipping_plane::Float32 = 1
   transform::Transform = Transform()
 end
 
-function project(p::Vec3, camera::PinholeCamera)
+function project(p::Vec3, camera::Camera)
   p = apply_transform(p, inv(camera.transform))
   f = camera.focal_length
   z = remap(p.z, camera.near_clipping_plane, camera.far_clipping_plane, 0F, 1F)
