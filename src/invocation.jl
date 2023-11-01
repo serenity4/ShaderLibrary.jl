@@ -22,9 +22,9 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
   ar = Float32(aspect_ratio(reference_attachment(parameters)))
   for instance in instances
     for (i, primitive) in enumerate(instance.primitives)
-      for vertex in vertices(primitive.mesh)
+      for vertex in primitive.mesh.vertex_attributes
         VT !== Nothing && push!(vertex_data, vertex.data)
-        location = apply_transform(vec3(vertex.location), primitive.transform)
+        location = apply_transform(vertex.location, primitive.transform)
         location.xy = device_coordinates(location.xy, ar)
         push!(vertex_locations, location)
         push!(primitive_indices, i - 1)
@@ -55,10 +55,11 @@ aspect_ratio(r::Resource) = aspect_ratio(dimensions(r.attachment))
 aspect_ratio(dims) = dims[1] / dims[2]
 aspect_ratio(::Nothing) = error("Dimensions must be specified for the reference attachment.")
 
-point3(x::Point{2}) = Point{3,eltype(x)}(x..., 1)
+point3(x::Point{2}) = Point{3,eltype(x)}(x..., 0)
 point3(x::Point{3}) = x
 
 vec3(x::Vec3) = x
+vec3(x::Tuple) = vec3(Point(x))
 vec3(x) = convert(Vec3, x)
 vec3(x::Vec{2}) = Vec3(x..., 0)
 vec3(x::Point{2}) = Vec3(x..., 0)

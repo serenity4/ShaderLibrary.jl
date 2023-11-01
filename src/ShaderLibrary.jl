@@ -17,7 +17,6 @@ using Erosion: ErosionMaps
 
 const Optional{T} = Union{T, Nothing}
 
-import GeometryExperiments: boundingelement
 import Lava: RenderTargets, Program, Command, ProgramInvocationData, DrawIndexed, render
 
 include("transforms.jl")
@@ -34,9 +33,13 @@ include("library/text.jl")
 # include("library/erosion.jl")
 
 export
-  TriangleList,
-  TriangleStrip,
-  Vertex, TriangleMesh,
+  MeshTopology,
+  MESH_TOPOLOGY_TRIANGLE_LIST,
+  MESH_TOPOLOGY_TRIANGLE_STRIP,
+  MESH_TOPOLOGY_TRIANGLE_FAN,
+  MeshEncoding,
+
+  Vertex, VertexMesh,
   FACE_ORIENTATION_CLOCKWISE,
   FACE_ORIENTATION_COUNTERCLOCKWISE,
   Primitive,

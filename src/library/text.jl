@@ -14,18 +14,18 @@ function renderables(cache::ProgramCache, text::Text, parameters::ShaderParamete
 end
 
 function glyph_quads(line::Line, segment::LineSegment, origin::Point{3})
-  quads = Rectangle{Vec2,QuadraticBezierPrimitiveData,Vector{Vec2}}[]
+  quads = Primitive{QuadraticBezierPrimitiveData,Vec2}[]
   curves = Arr{3,Vec2}[]
   processed_glyphs = Dict{Int64,UnitRange{Int64}}() # to glyph range
   n = length(segment.indices)
   (; font, options) = segment
-  (; r, g, b) = segment.style.color
+  (; r, g, b) = something(segment.style.color, RGB(1f0, 1f0, 1f0))
   color = (r, g, b)
   vertex_data = Vec2[(0, 0), (1, 0), (0, 1), (1, 1)]
   for i in segment.indices
     glyph = line.glyphs[i]
     iszero(glyph) && continue
-    position = line.positions[i]
+    position = point3(line.positions[i])
     outlines = line.outlines[glyph]
     box = boundingelement(outlines)
 
@@ -39,9 +39,10 @@ function glyph_quads(line::Line, segment::LineSegment, origin::Point{3})
     end
 
     quad_data = QuadraticBezierPrimitiveData(range .- 1, 20options.font_size.value, color)
-    push!(quads, Rectangle(box, Point3f(position..., 0.0) + origin, vertex_data, quad_data))
+    rect = Rectangle(box, vertex_data, quad_data)
+    push!(quads, Primitive(rect, position + origin))
   end
-  (; quads = Primitive.(quads), curves)
+  (; quads, curves)
 end
 
-boundingelement(text::Text) = boundingelement(text.data, [text.font => text.options])
+GeometryExperiments.boundingelement(text::Text) = boundingelement(text.data, [text.font => text.options])

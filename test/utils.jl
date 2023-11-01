@@ -1,6 +1,8 @@
 render_file(filename; tmp = false) = joinpath(@__DIR__, "renders", tmp ? "tmp" : "", filename)
 texture_file(filename) = joinpath(@__DIR__, "textures", filename)
 font_file(filename) = joinpath(@__DIR__, "fonts", filename)
+gltf_file(filename) = joinpath(@__DIR__, "assets", filename)
+read_mesh(filename) = load_gltf(gltf_file(filename))
 read_texture(filename) = convert(Matrix{RGBA{Float16}}, load(texture_file("normal.png")))
 
 function save_render(filename, data; tmp = false)
