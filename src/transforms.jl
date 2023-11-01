@@ -7,7 +7,7 @@ end
 Plane(normal) = Plane(convert(Vec3, normal))
 function Plane(normal::Vec3)
   iszero(normal) && return Plane(Vec3(1, 0, 0), Vec3(0, 1, 0))
-  u = @ga 3 Vec3 normal::Vector × 1::e1
+  u = @ga 3 Vec3 normal::Vector × 1f0::e1
   iszero(u) && (u = @ga 3 Vec3 dual(normal::Vector × 1f0::e2))
   v = @ga 3 Vec3 dual(normal::Vector × u::Vector)
   Plane(u, v)

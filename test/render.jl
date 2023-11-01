@@ -92,7 +92,7 @@
     mesh = VertexMesh(mesh.encoding, [Vertex(location, Vec3(rand(NTuple{3,Float32}))) for location in mesh.vertex_attributes])
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
     grad = Gradient()
-    camera = Camera(transform = Transform(rotation = Rotation(Plane(Vec3(0, 0, 1)), pi/4)))
+    camera = Camera(focal_length = 2, transform = Transform(rotation = Rotation(Plane(Vec3(0, 0, 1)), pi/4)))
     render(device, grad, (@set parameters.camera = camera), primitive)
     data = collect(color, device)
     # XXX: Rotate the cube to see that it's 3D geometry, and make colors deterministic.

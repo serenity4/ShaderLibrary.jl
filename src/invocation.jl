@@ -6,6 +6,7 @@
   instance_data::DeviceAddress # optional vector indexed by InstanceIndex
   user_data::DeviceAddress # user-defined data
   camera::Camera # provided as a shader parameter
+  aspect_ratio::Float32 # computed from a "reference" attachment (i.e. the color attachment in most cases)
 end
 
 data_container(::Type{Nothing}) = nothing
@@ -20,13 +21,12 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
   vertex_data, primitive_data, instance_data = data_container.((VT, PT, IT))
   vertex_locations = Vec3[]
   primitive_indices = UInt32[]
-  ar = Float32(aspect_ratio(reference_attachment(parameters)))
+  ar = aspect_ratio(reference_attachment(parameters))
   for instance in instances
     for (i, primitive) in enumerate(instance.primitives)
       for vertex in primitive.mesh.vertex_attributes
         VT !== Nothing && push!(vertex_data, vertex.data)
         location = apply_transform(vertex.location, primitive.transform)
-        location.xy = device_coordinates(location.xy, ar)
         push!(vertex_locations, location)
         push!(primitive_indices, i - 1)
       end
@@ -43,7 +43,7 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
     idata = IT === Nothing ? DeviceAddress(0) : @address(@block instance_data)
     data = user_data(shader, __context__)
     udata = isnothing(data) ? DeviceAddress(0) : @address(@block data)
-    @block InvocationData(vlocs, vdata, pdata, pinds, idata, udata, parameters.camera)
+    @block InvocationData(vlocs, vdata, pdata, pinds, idata, udata, parameters.camera, ar)
   end
 end
 

@@ -4,6 +4,7 @@ function gradient_vert(frag_color, position, index, data_address::DeviceAddressB
   data = @load data_address::InvocationData
   pos = @load data.vertex_locations[index]::Vec3
   pos = project(pos, data.camera)
+  pos.xy = device_coordinates(pos.xy, data.aspect_ratio)
   color = @load data.vertex_data[index]::Vec3
   position[] = Vec4(pos.x, pos.y, pos.z, 1F)
   frag_color.rgb = color

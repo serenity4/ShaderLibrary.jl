@@ -60,6 +60,7 @@ function quadratic_bezier_fill_vert(position, frag_coordinates, frag_primitive_i
   data = @load data_address::InvocationData
   pos = @load data.vertex_locations[index]::Vec3
   pos = project(pos, data.camera)
+  pos.xy = device_coordinates(pos.xy, data.aspect_ratio)
   position[] = Vec4(pos.x, pos.y, pos.z, 1F)
   frag_coordinates[] = @load data.vertex_data[index]::Vec2
   frag_primitive_index.x = @load data.primitive_indices[index]::UInt32
