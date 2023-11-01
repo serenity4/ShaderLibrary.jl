@@ -89,7 +89,31 @@
 
   @testset "Meshes" begin
     mesh = read_mesh("cube.gltf")
-    mesh = VertexMesh(mesh.encoding, [Vertex(location, Vec3(rand(NTuple{3,Float32}))) for location in mesh.vertex_attributes])
+    colors = Vec3[(0.43, 0.18, 0.68),
+                  (0.76, 0.37, 0.76),
+                  (0.02, 0.27, 0.27),
+                  (0.10, 0.17, 0.57),
+                  (0.60, 0.71, 0.60),
+                  (0.84, 0.73, 0.35),
+                  (0.41, 0.19, 0.54),
+                  (0.61, 0.49, 0.44),
+                  (0.70, 0.75, 0.27),
+                  (0.91, 0.06, 0.61),
+                  (0.17, 0.78, 0.39),
+                  (0.39, 0.28, 0.25),
+                  (0.31, 0.15, 0.65),
+                  (0.03, 0.96, 0.54),
+                  (0.49, 0.05, 0.29),
+                  (0.53, 0.81, 0.18),
+                  (0.90, 0.63, 0.97),
+                  (0.70, 0.51, 0.09),
+                  (0.90, 0.84, 0.74),
+                  (0.66, 0.30, 0.86),
+                  (0.01, 0.78, 0.18),
+                  (0.91, 0.53, 0.98),
+                  (0.16, 0.01, 0.53),
+                  (0.49, 0.05, 0.38)]
+    mesh = VertexMesh(mesh.encoding, Vertex.(mesh.vertex_attributes, colors))
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
     grad = Gradient()
     camera = Camera(focal_length = 2, transform = Transform(rotation = Rotation(Plane(Vec3(0, 0, 1)), pi/4)))
