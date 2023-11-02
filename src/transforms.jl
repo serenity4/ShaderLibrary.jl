@@ -4,9 +4,10 @@
   Plane(u, v) = new(normalize(convert(Vec3, u)), normalize(convert(Vec3, v)))
 end
 
+Plane(coords::Real...) = Plane(coords)
 Plane(normal) = Plane(convert(Vec3, normal))
 function Plane(normal::Vec3)
-  iszero(normal) && return Plane(Vec3(1, 0, 0), Vec3(0, 1, 0))
+  iszero(normal) && return Plane((1, 0, 0), (0, 1, 0))
   u = @ga 3 Vec3 normal::Vector × 1f0::e1
   iszero(u) && (u = @ga 3 Vec3 dual(normal::Vector × 1f0::e2))
   v = @ga 3 Vec3 dual(normal::Vector × u::Vector)
@@ -71,13 +72,26 @@ the far clipping plane.
 @struct_hash_equal_isapprox Base.@kwdef struct Camera
   focal_length::Float32 = 1.0
   near_clipping_plane::Float32 = 0
-  far_clipping_plane::Float32 = 1
+  far_clipping_plane::Float32 = 100
   transform::Transform = Transform()
 end
 
 function project(p::Vec3, camera::Camera)
+  # 3D world space -> camera local space.
   p = apply_transform(p, inv(camera.transform))
+
+  # Camera local space -> 2D screen space.
   f = camera.focal_length
-  z = remap(p.z, camera.near_clipping_plane, camera.far_clipping_plane, 0F, 1F)
-  Vec3(p.x/f, p.y/f, z)
+  x, y = p.x/f, p.y/f
+
+  # Even though we lose a dimension, we keep a Z coordinate to encode something else: the depth,
+  # or abstract distance at which the object is from the camera.
+  # The camera is looking down, meaning that the depth value of an object will be along the -Z axis of the camera, so we negate the Z coordinate.
+  z = -p.z
+
+  # We want to encode the depth between 0 and 1, such that device coordinates may use it for depth clipping.
+  # For this, we remap from [near_clipping_plane; far_clipping_plane] to [0; 1].
+  z = remap(z, camera.near_clipping_plane, camera.far_clipping_plane, 0F, 1F)
+
+  Vec3(x, y, z)
 end

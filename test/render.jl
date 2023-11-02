@@ -116,8 +116,7 @@
     mesh = VertexMesh(mesh.encoding, Vertex.(mesh.vertex_attributes, colors))
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(Plane((1, 0, 1)), 0.3pi)))
     grad = Gradient()
-    # XXX: The near and far clipping planes are currently backward to decide what is cut in front of and behind the screen.
-    camera = Camera(focal_length = 2, near_clipping_plane = -1, far_clipping_plane = 2)
+    camera = Camera(focal_length = 2, near_clipping_plane = -2)
     cube_parameters = setproperties(parameters, (; camera))
     render(device, grad, cube_parameters, primitive)
     data = collect(color, device)
