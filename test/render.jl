@@ -88,7 +88,6 @@
   end
 
   @testset "Meshes" begin
-    mesh = read_mesh("cube.gltf")
     colors = Vec3[(0.43, 0.18, 0.68),
                   (0.76, 0.37, 0.76),
                   (0.02, 0.27, 0.27),
@@ -113,13 +112,15 @@
                   (0.91, 0.53, 0.98),
                   (0.16, 0.01, 0.53),
                   (0.49, 0.05, 0.38)]
+    mesh = read_mesh("cube.gltf")
     mesh = VertexMesh(mesh.encoding, Vertex.(mesh.vertex_attributes, colors))
-    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
+    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(Plane((1, 0, 1)), 0.3pi)))
     grad = Gradient()
-    camera = Camera(focal_length = 2, transform = Transform(rotation = Rotation(Plane(Vec3(0, 0, 1)), pi/4)))
-    render(device, grad, (@set parameters.camera = camera), primitive)
+    # XXX: The near and far clipping planes are currently backward to decide what is cut in front of and behind the screen.
+    camera = Camera(focal_length = 2, near_clipping_plane = -1, far_clipping_plane = 2)
+    cube_parameters = setproperties(parameters, (; camera))
+    render(device, grad, cube_parameters, primitive)
     data = collect(color, device)
-    # XXX: Rotate the cube to see that it's 3D geometry, and make colors deterministic.
-    save_test_render("colored_cube.png", data)
+    save_test_render("colored_cube.png", data, 0x0574cf0b4f40eeec)
   end
 end;

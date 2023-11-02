@@ -1,9 +1,9 @@
 using ShaderLibrary
 using ShaderLibrary: glyph_quads, Text
 using Test
-using GeometryExperiments: Point2, Point3f, load_gltf
+using GeometryExperiments: Point2, Point3f, load_mesh_gltf
 using Lava
-using Accessors: @set
+using Accessors: @set, setproperties
 using SPIRV.MathFunctions
 using SPIRV: @compile, validate, F, U, Vec3, Vec2, unwrap
 using Erosion
