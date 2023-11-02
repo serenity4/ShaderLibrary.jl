@@ -14,26 +14,34 @@ function Plane(normal::Vec3)
 end
 
 @struct_hash_equal_isapprox struct Rotation
-  plane::Plane
-  angle::Float32
+  quaternion::Vec4
+end
+
+function Rotation(plane::Plane, angle::Real)
+  # Define rotation bivector which encodes a rotation in the given plane by the specified angle.
+  ϕ = @ga 3 Vec3 angle::0 ⟑ (plane.u::1 ∧ plane.v::1)
+  # Define rotation generator to be applied to perform the operation.
+  Ω = @ga 3 Vec4 exp((ϕ::2) / 2f0::0)::(0 + 2)
+  Rotation(Ω)
 end
 
 Rotation(axis::Vec3) = Rotation(Plane(normalize(axis)), norm(axis))
 Rotation() = Rotation(Plane(Vec3(0, 0, 1)), 0)
 
-Base.inv(rot::Rotation) = @set rot.angle = -rot.angle
-Base.iszero(rot::Rotation) = iszero(rot.angle)
+Base.inv(rot::Rotation) = Rotation(@ga 3 Vec4 inverse(rot.quaternion::(0 + 2))::(0 + 2))
+Base.iszero(rot::Rotation) = isone(rot.quaternion[1])
 
 function apply_rotation(p::Vec3, rotation::Rotation)
-  # Define rotation bivector which encodes a rotation in the given plane by the specified angle.
-  ϕ = @ga 3 Vec3 rotation.angle::Scalar ⟑ (rotation.plane.u::Vector ∧ rotation.plane.v::Vector)
-  # Define rotation generator to be applied to perform the operation.
-  Ω = @ga 3 Tuple exp((ϕ::Bivector) / 2f0::Scalar)
+  Ω = rotation.quaternion
   @ga 3 Vec3 begin
-    Ω::(Scalar, Bivector)
-    inverse(Ω) ⟑ p::Vector ⟑ Ω
+    Ω::(0 + 2)
+    inverse(Ω) ⟑ p::1 ⟑ Ω
   end
 end
+
+struct Degree end
+Base.:(*)(x, ::Degree) = deg2rad(x)
+const ° = Degree()
 
 @struct_hash_equal_isapprox Base.@kwdef struct Transform
   translation::Vec3 = (0, 0, 0)

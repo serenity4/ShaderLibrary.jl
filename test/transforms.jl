@@ -10,18 +10,16 @@
   @testset "Rotation" begin
     rot = Rotation()
     @test iszero(rot)
-    rot = Rotation(Plane((1, 0, 0), (0, 1, 0)), (π)F/4)
+    plane = Plane((1, 0, 0), (0, 1, 0))
+    rot = Rotation(plane, (45F)°)
     p = Vec3(0.2, 0.2, 1.0)
     p′ = apply_rotation(p, rot)
     @test p′.z == p.z
     @test p′.xy ≈ Vec2(0, 0.2sqrt(2))
-    @test apply_rotation(p, @set rot.angle = 0) == p
+    @test apply_rotation(p, Rotation(plane, 0)) == p
     rot = Rotation(Plane(Tuple(rand(3))), 1.5)
     @test apply_rotation(p, rot) ≉ p
-    # Works fairly well for small angles, but will not work in general
-    # because the rotation is expressed in terms of rotated axes (body frame).
-    # We'd need to express rotation with respect to a fixed reference frame to obtain an inverse.
-    @test_broken apply_rotation(apply_rotation(p, rot), inv(rot)) ≈ p
+    @test apply_rotation(apply_rotation(p, rot), inv(rot)) ≈ p
 
     @test unwrap(validate(@compile apply_rotation(::Vec3, ::Rotation)))
   end

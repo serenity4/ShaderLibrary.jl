@@ -59,7 +59,7 @@ export
   renderables, render, compute,
 
   Camera,
-  Rotation,
+  Rotation, °,
   Plane,
   Transform,
   project,
