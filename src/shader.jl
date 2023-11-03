@@ -39,6 +39,10 @@ renderables(shader::ShaderComponent, parameters::ShaderParameters, device, args.
 
 default_texture(image::Resource) = Texture(image, setproperties(DEFAULT_SAMPLING, (magnification = Vk.FILTER_LINEAR, minification = Vk.FILTER_LINEAR)))
 
+"""
+Logical object that can be converted into a GPU rendering command as a `Command` (if available for a given component) or as
+a list of `RenderNode`s.
+"""
 abstract type GraphicsShaderComponent <: ShaderComponent end
 
 reference_attachment(parameters::ShaderParameters) = parameters.color[1]
@@ -75,6 +79,19 @@ Command(shader::ShaderComponent, parameters::ShaderParameters, device, args...) 
 const DEFAULT_CLEAR_VALUE = ClearValue((0.08, 0.05, 0.1, 1.0))
 
 resource_dependencies(shader::GraphicsShaderComponent) = Lava.Dictionary{Resource,ResourceDependency}()
+
+"""
+Way to shade a geometry in context of a rendering process.
+
+While [`GraphicsShaderComponent`](@ref) are not necessarily parametrized by a geometry, and may instead
+generate one based on inputs (e.g. [`Text`](@ref) generating a set of bounding boxes for individual glyphs),
+materials require a geometry to function.
+
+Materials are applicable to 2D and 3D objects alike, with the note that 2D objects are required
+to be embedded within 3D space with a third coordinate corresponding to depth, such that drawing
+order may be well-defined.
+"""
+abstract type Material <: GraphicsShaderComponent end
 
 abstract type ComputeShaderComponent <: ShaderComponent end
 

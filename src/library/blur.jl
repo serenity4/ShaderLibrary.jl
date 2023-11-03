@@ -71,8 +71,8 @@ function renderables(cache::ProgramCache, blur::GaussianBlur, parameters::Shader
 
   # First, blur the whole texture once, then blur only the relevant portion.
   blur_x = GaussianBlurDirectional(blur.texture, BLUR_HORIZONTAL, blur.size)
-  uvs = [0.5F * (one(Vec2) + Vec2(p)) for p in PointSet(HyperCube{2}, Point2f)]
-  rect = Rectangle(Point(-1, -1), Point(1, 1), uvs, nothing)
+  uvs = Vec2.([0.5 * (1 .+ p) for p in PointSet(HyperCube{2}, Point2f)])
+  rect = Rectangle((-1, -1), (1, 1), uvs, nothing)
 
   transient_image = Resource(similar(transient_color.attachment.view.image; usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_SAMPLED_BIT), :transient_image)
   transiant_parameters = @set parameters.color[1] = transient_color

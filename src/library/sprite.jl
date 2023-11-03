@@ -1,4 +1,4 @@
-struct Sprite <: GraphicsShaderComponent
+struct Sprite <: Material
   texture::Texture
 end
 Sprite(image::Resource) = Sprite(default_texture(image))

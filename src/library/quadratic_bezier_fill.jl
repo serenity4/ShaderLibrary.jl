@@ -46,7 +46,7 @@ function intensity(position, curves::DeviceAddress, range, pixel_per_em)
   sqrt(abs(res))
 end
 
-struct QuadraticBezierFill <: GraphicsShaderComponent
+struct QuadraticBezierFill <: Material
   curves::Vector{Arr{3,Vec2}}
 end
 

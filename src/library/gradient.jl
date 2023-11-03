@@ -1,4 +1,4 @@
-struct Gradient <: GraphicsShaderComponent end
+struct Gradient <: Material end
 
 function gradient_vert(frag_color, position, index, data_address::DeviceAddressBlock)
   data = @load data_address::InvocationData
