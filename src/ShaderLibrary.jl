@@ -16,6 +16,7 @@ using OpenType: curves, curves_normalized, Line
 using Erosion
 using Erosion: ErosionMaps
 using StructEquality: @struct_hash_equal, @struct_hash_equal_isapprox
+using LinearAlgebra: ⋅, ×
 
 const Optional{T} = Union{T, Nothing}
 
@@ -32,6 +33,7 @@ include("library/sprite.jl")
 include("library/blur.jl")
 include("library/quadratic_bezier_fill.jl")
 include("library/text.jl")
+include("library/pbr.jl")
 # include("library/erosion.jl")
 
 export
@@ -49,15 +51,19 @@ export
 
   ShaderComponent, GraphicsShaderComponent, ComputeShaderComponent,
   ShaderParameters, ClearValue,
-  Gradient, PosColor,
-  Rectangle,
-  Sprite,
-  QuadraticBezierFill, QuadraticBezierPrimitiveData,
-  GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL,
-  GaussianBlur,
-  LargeScaleErosion,
   ProgramCache,
   renderables, render, compute,
+  PhysicalBuffer, PhysicalRef,
+  # Materials
+  Gradient,
+  Sprite,
+  QuadraticBezierFill, QuadraticBezierPrimitiveData,
+  PBR, BSDF, PointLight,
+  # Geometries
+  Rectangle,
+  # Graphics shader components
+  GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL, GaussianBlur,
+  LargeScaleErosion,
 
   Camera,
   Rotation, °,

@@ -19,9 +19,11 @@ Base.IteratorEltype(::Type{PhysicalBuffer{T}}) where {T} = Base.HasEltype()
 Base.eltype(::Type{PhysicalBuffer{T}}) where {T} = T
 Base.length(buffer::PhysicalBuffer) = buffer.size
 
+PhysicalBuffer{T}(size::Integer, buffer::Buffer) where {T} = PhysicalBuffer{T}(size, DeviceAddress(buffer))
+
 @struct_hash_equal struct InvocationData
   vertex_locations::PhysicalBuffer{Vec3} # indexed by vertex index
-  vertex_normals::PhysicalBuffer{Vec2} # indexed by vertex index
+  vertex_normals::PhysicalBuffer{Vec3} # indexed by vertex index
   vertex_data::DeviceAddress # optional vector indexed by vertex index
   primitive_data::DeviceAddress # optional vector indexed by primitive index
   primitive_indices::DeviceAddress # primitive index by vertex index
@@ -67,7 +69,7 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
 
   @invocation_data prog begin
     vlocs = PhysicalBuffer{Vec3}(length(vertex_locations), @address(@block vertex_locations))
-    vnorms = PhysicalBuffer{Vec2}(0, DeviceAddress(0))
+    vnorms = PhysicalBuffer{Vec3}(0, DeviceAddress(0))
     vdata = VT === Nothing ? DeviceAddress(0) : @address(@block vertex_data)
     pdata = PT === Nothing ? DeviceAddress(0) : @address(@block primitive_data)
     pinds = @address(@block primitive_indices)

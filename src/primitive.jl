@@ -2,7 +2,7 @@ struct Vertex{T}
   location::Vec3
   data::T
 end
-Vertex(location, data) = Vertex(vec3(location), data)
+Vertex(location, data = nothing) = Vertex(vec3(location), data)
 
 GeometryExperiments.location(vertex::Vertex) = vertex.location
 

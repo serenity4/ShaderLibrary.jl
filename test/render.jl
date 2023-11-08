@@ -122,4 +122,13 @@
     data = collect(color, device)
     save_test_render("colored_cube.png", data, 0x0574cf0b4f40eeec)
   end
+
+  @testset "PBR" begin
+    bsdf = BSDF{Float32}((1.0, 1.0, 1.0), 0.0, 0.1, 0.5)
+    lights = [PointLight((2.0, 1.0, 1.0), (1.0, 1.0, 1.0), 1.0, 1.0)]
+    lights_buffer = Buffer(device; data = lights)
+    pbr = PBR(bsdf, PhysicalBuffer{PointLight}(length(lights), lights_buffer))
+    prog = Program(typeof(pbr), device)
+    @test isa(prog, Program)
+  end
 end;
