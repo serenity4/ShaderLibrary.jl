@@ -35,20 +35,19 @@ function gaussian_blur_directional(reference, uv, direction, size)
   res
 end
 
-function gaussian_blur_directional_frag(out_color, uv, data_address, textures)
-  data = @load data_address::InvocationData
+function gaussian_blur_directional_frag(color, uv, (; data)::PhysicalRef{InvocationData}, textures)
   direction, size, texture_index = @load data.user_data::Tuple{UInt32, Float32, DescriptorIndex}
   reference = textures[texture_index]
-  out_color.rgb = gaussian_blur_directional(reference, uv, direction, size)
-  out_color.a = 1F + 0F
+  color.rgb = gaussian_blur_directional(reference, uv, direction, size)
+  color.a = 1F
 end
 
 function Program(::Type{GaussianBlurDirectional}, device)
-  vert = @vertex device sprite_vert(::Vec2::Output, ::Vec4::Output{Position}, ::UInt32::Input{VertexIndex}, ::DeviceAddressBlock::PushConstant)
+  vert = @vertex device sprite_vert(::Vec2::Output, ::Vec4::Output{Position}, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device gaussian_blur_directional_frag(
     ::Vec4::Output,
     ::Vec2::Input,
-    ::DeviceAddressBlock::PushConstant,
+    ::PhysicalRef{InvocationData}::PushConstant,
     ::Arr{2048,SPIRV.SampledImage{image_type(SPIRV.ImageFormatRgba16f, SPIRV.Dim2D, 0, false, false, 1)}}::UniformConstant{@DescriptorSet(0), @Binding(3)})
   Program(vert, frag)
 end

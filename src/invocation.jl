@@ -1,5 +1,26 @@
+struct PhysicalRef{T}
+  address::DeviceAddress
+end
+Base.getindex(ref::PhysicalRef{T}) where {T} = @load ref.address::T
+Base.getproperty(ref::PhysicalRef, name::Symbol) = name === :data ? ref[] : getfield(ref, name)
+
+struct PhysicalBuffer{T}
+  size::UInt32
+  address::DeviceAddress
+end
+
+Base.getindex(buffer::PhysicalBuffer{T}, i) where {T} = @load buffer.address[unsigned_index(i)]::T
+Base.iterate(buffer::PhysicalBuffer) = iterate(buffer, 0U)
+function Base.iterate(buffer::PhysicalBuffer{T}, i) where {T}
+  i > buffer.size && return nothing
+  (buffer[i], i + one(i))
+end
+Base.IteratorEltype(::Type{PhysicalBuffer{T}}) where {T} = Base.HasEltype()
+Base.eltype(::Type{PhysicalBuffer{T}}) where {T} = T
+Base.length(buffer::PhysicalBuffer) = buffer.size
+
 @struct_hash_equal struct InvocationData
-  vertex_locations::DeviceAddress # Vector{Vec3} indexed by VertexIndex
+  vertex_locations::PhysicalBuffer{Vec3} # Vector{Vec3} indexed by VertexIndex
   vertex_data::DeviceAddress # optional vector indexed by VertexIndex
   primitive_data::DeviceAddress # optional vector indexed by primitive index
   primitive_indices::DeviceAddress # primitive index by vertex index
@@ -36,7 +57,7 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
   end
 
   @invocation_data prog begin
-    vlocs = @address(@block vertex_locations)
+    vlocs = PhysicalBuffer{Vec3}(length(vertex_locations), @address(@block vertex_locations))
     vdata = VT === Nothing ? DeviceAddress(0) : @address(@block vertex_data)
     pdata = PT === Nothing ? DeviceAddress(0) : @address(@block primitive_data)
     pinds = @address(@block primitive_indices)
@@ -65,3 +86,10 @@ vec3(x) = convert(Vec3, x)
 vec3(x::Vec{2}) = Vec3(x..., 0)
 vec3(x::Point{2}) = Vec3(x..., 0)
 vec3(x::Point{3}) = Vec3(x...)
+
+world_to_screen_coordinates(position, data::InvocationData) = world_to_screen_coordinates(position, data.camera, data.aspect_ratio)
+function world_to_screen_coordinates(position, camera::Camera, aspect_ratio)
+  position = project(position, camera)
+  position.xy = device_coordinates(position.xy, aspect_ratio)
+  position
+end

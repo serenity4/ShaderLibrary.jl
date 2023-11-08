@@ -56,18 +56,13 @@ struct QuadraticBezierPrimitiveData
   color::Vec3
 end
 
-function quadratic_bezier_fill_vert(position, frag_coordinates, frag_primitive_index, index, data_address)
-  data = @load data_address::InvocationData
-  pos = @load data.vertex_locations[index]::Vec3
-  pos = project(pos, data.camera)
-  pos.xy = device_coordinates(pos.xy, data.aspect_ratio)
-  position[] = Vec4(pos.x, pos.y, pos.z, 1F)
+function quadratic_bezier_fill_vert(position, frag_coordinates, frag_primitive_index::Vec{2,UInt32}, index, (; data)::PhysicalRef{InvocationData})
+  position.xyz = world_to_screen_coordinates(data.vertex_locations[index], data)
   frag_coordinates[] = @load data.vertex_data[index]::Vec2
   frag_primitive_index.x = @load data.primitive_indices[index]::UInt32
 end
 
-function quadratic_bezier_fill_frag(out_color, coordinates, primitive_index, data_address)
-  data = @load data_address::InvocationData
+function quadratic_bezier_fill_frag(out_color, coordinates, primitive_index, (; data)::PhysicalRef{InvocationData})
   curves = data.user_data # Vector{Arr{3,Vec2}}
   (; color, range, sharpness) = @load data.primitive_data[primitive_index.x]::QuadraticBezierPrimitiveData
   out_color.rgb = color
@@ -75,8 +70,8 @@ function quadratic_bezier_fill_frag(out_color, coordinates, primitive_index, dat
 end
 
 function Program(::Type{QuadraticBezierFill}, device)
-  vert = @vertex device quadratic_bezier_fill_vert(::Vec4::Output{Position}, ::Vec2::Output, ::Vec{2,UInt32}::Output, ::UInt32::Input{VertexIndex}, ::DeviceAddressBlock::PushConstant)
-  frag = @fragment device quadratic_bezier_fill_frag(::Vec4::Output, ::Vec2::Input, ::Vec{2,UInt32}::Input{@Flat}, ::DeviceAddressBlock::PushConstant)
+  vert = @vertex device quadratic_bezier_fill_vert(::Vec4::Output{Position}, ::Vec2::Output, ::Vec{2,UInt32}::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+  frag = @fragment device quadratic_bezier_fill_frag(::Vec4::Output, ::Vec2::Input, ::Vec{2,UInt32}::Input{@Flat}, ::PhysicalRef{InvocationData}::PushConstant)
   Program(vert, frag)
 end
 

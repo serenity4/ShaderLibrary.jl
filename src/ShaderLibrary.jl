@@ -9,6 +9,7 @@ using SPIRV.MathFunctions
 using GeometryExperiments
 using Lava
 using SPIRV
+using SPIRV: unsigned_index
 using SymbolicGA: @ga
 using OpenType
 using OpenType: curves, curves_normalized, Line
