@@ -20,8 +20,9 @@ Base.eltype(::Type{PhysicalBuffer{T}}) where {T} = T
 Base.length(buffer::PhysicalBuffer) = buffer.size
 
 @struct_hash_equal struct InvocationData
-  vertex_locations::PhysicalBuffer{Vec3} # Vector{Vec3} indexed by VertexIndex
-  vertex_data::DeviceAddress # optional vector indexed by VertexIndex
+  vertex_locations::PhysicalBuffer{Vec3} # indexed by vertex index
+  vertex_normals::PhysicalBuffer{Vec2} # indexed by vertex index
+  vertex_data::DeviceAddress # optional vector indexed by vertex index
   primitive_data::DeviceAddress # optional vector indexed by primitive index
   primitive_indices::DeviceAddress # primitive index by vertex index
   instance_data::DeviceAddress # optional vector indexed by InstanceIndex
@@ -29,6 +30,14 @@ Base.length(buffer::PhysicalBuffer) = buffer.size
   camera::Camera # provided as a shader parameter
   aspect_ratio::Float32 # computed from a "reference" attachment (i.e. the color attachment in most cases)
 end
+
+"""
+    interface(::GraphicsShaderComponent)
+
+Return a tuple type `Tuple{VT,PT,IT,UT}` representing expected types for primitive, vertex, instance and user data.
+A type of `Nothing` indicates the absence of value.
+"""
+function interface end
 
 data_container(::Type{Nothing}) = nothing
 data_container(::Type{T}) where {T} = T[]
@@ -58,13 +67,14 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
 
   @invocation_data prog begin
     vlocs = PhysicalBuffer{Vec3}(length(vertex_locations), @address(@block vertex_locations))
+    vnorms = PhysicalBuffer{Vec2}(0, DeviceAddress(0))
     vdata = VT === Nothing ? DeviceAddress(0) : @address(@block vertex_data)
     pdata = PT === Nothing ? DeviceAddress(0) : @address(@block primitive_data)
     pinds = @address(@block primitive_indices)
     idata = IT === Nothing ? DeviceAddress(0) : @address(@block instance_data)
     data = user_data(shader, __context__)
     udata = isnothing(data) ? DeviceAddress(0) : @address(@block data)
-    @block InvocationData(vlocs, vdata, pdata, pinds, idata, udata, parameters.camera, ar)
+    @block InvocationData(vlocs, vnorms, vdata, pdata, pinds, idata, udata, parameters.camera, ar)
   end
 end
 

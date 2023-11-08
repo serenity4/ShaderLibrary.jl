@@ -43,7 +43,7 @@ function gaussian_blur_directional_frag(color, uv, (; data)::PhysicalRef{Invocat
 end
 
 function Program(::Type{GaussianBlurDirectional}, device)
-  vert = @vertex device sprite_vert(::Vec2::Output, ::Vec4::Output{Position}, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+  vert = @vertex device sprite_vert(::Vec4::Output{Position}, ::Vec2::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device gaussian_blur_directional_frag(
     ::Vec4::Output,
     ::Vec2::Input,

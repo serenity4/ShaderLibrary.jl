@@ -1,13 +1,5 @@
 abstract type ShaderComponent end
 
-"""
-    interface(::ShaderComponent)
-
-Return a tuple type `Tuple{VT,PT,IT,UT}` representing expected types for primitive, vertex, instance and user data.
-A type of `Nothing` indicates the absence of value.
-"""
-function interface end
-
 struct ShaderParameters
   color::Vector{Resource}
   color_clear::Vector{Optional{ClearValue}}
