@@ -14,7 +14,7 @@ function renderables(cache::ProgramCache, text::Text, parameters::ShaderParamete
 end
 
 function glyph_quads(line::Line, segment::LineSegment, origin::Point{3})
-  quads = Primitive{QuadraticBezierPrimitiveData,Vec2}[]
+  quads = Primitive{QuadraticBezierPrimitiveData,Vector{Vec2},Nothing,Vector{Vec2}}[]
   curves = Arr{3,Vec2}[]
   processed_glyphs = Dict{Int64,UnitRange{Int64}}() # to glyph range
   n = length(segment.indices)

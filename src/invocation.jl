@@ -23,6 +23,7 @@ PhysicalBuffer{T}(size::Integer, buffer::Buffer) where {T} = PhysicalBuffer{T}(s
 
 @struct_hash_equal struct InvocationData
   vertex_locations::PhysicalBuffer{Vec3} # indexed by vertex index
+  "Vertex normals in object space."
   vertex_normals::PhysicalBuffer{Vec3} # indexed by vertex index
   vertex_data::DeviceAddress # optional vector indexed by vertex index
   primitive_data::DeviceAddress # optional vector indexed by primitive index
@@ -43,34 +44,37 @@ function interface end
 
 data_container(::Type{Nothing}) = nothing
 data_container(::Type{T}) where {T} = T[]
+data_container(::Type{Vector{T}}) where {T} = T[]
 
 ProgramInvocationData(shader::GraphicsShaderComponent, parameters, prog, instance::Instance) = ProgramInvocationData(shader, parameters, prog, SA[instance])
 ProgramInvocationData(shader::GraphicsShaderComponent, parameters, prog, primitive::Primitive) = ProgramInvocationData(shader, parameters, prog, SA[primitive])
 ProgramInvocationData(shader::GraphicsShaderComponent, parameters, prog, primitives::AbstractVector{<:Primitive}) = ProgramInvocationData(shader, parameters, prog, Instance(primitives))
 
-function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::ShaderParameters, prog, instances::AbstractVector{<:Instance{IT,PT,VT}}) where {IT,PT,VT}
-  Tuple{VT,PT,IT} <: interface(shader) || throw(ArgumentError("The provided instances do not respect the interface declared by $shader: ($VT,$PT,$IT) ≠ $((interface(shader).parameters...,))"))
-  vertex_data, primitive_data, instance_data = data_container.((VT, PT, IT))
+function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::ShaderParameters, prog, instances::AbstractVector{<:Instance{IT,PT,VD}}) where {IT,PT,VD}
+  Tuple{VD,PT,IT} <: interface(shader) || throw(ArgumentError("The provided instances do not respect the interface declared by $shader: ($VT,$PT,$IT) ≠ $((interface(shader).parameters...,))"))
+  vertex_data, primitive_data, instance_data = data_container.((VD, PT, IT))
   vertex_locations = Vec3[]
+  vertex_normals = Vec3[]
   primitive_indices = UInt32[]
   ar = aspect_ratio(reference_attachment(parameters))
   for instance in instances
     for (i, primitive) in enumerate(instance.primitives)
-      for vertex in primitive.mesh.vertex_attributes
-        VT !== Nothing && push!(vertex_data, vertex.data)
-        location = apply_transform(vertex.location, primitive.transform)
-        push!(vertex_locations, location)
-        push!(primitive_indices, i - 1)
-      end
+      (; mesh) = primitive
+      VD !== Nothing && append!(vertex_data, mesh.vertex_data)
+      append!(vertex_locations, apply_transform(vec3(location), primitive.transform) for location in mesh.vertex_locations)
+      append!(vertex_normals, @something(mesh.vertex_normals, Vec3(1, 0, 0) for _ in 1:nv(mesh)))
+      append!(primitive_indices, i - 1 for _ in 1:nv(mesh))
       PT !== Nothing && push!(primitive_data, primitive.data)
     end
     IT !== Nothing && push!(instance_data, instance.data)
   end
 
+  @assert length(vertex_locations) == length(vertex_normals)
+
   @invocation_data prog begin
     vlocs = PhysicalBuffer{Vec3}(length(vertex_locations), @address(@block vertex_locations))
-    vnorms = PhysicalBuffer{Vec3}(0, DeviceAddress(0))
-    vdata = VT === Nothing ? DeviceAddress(0) : @address(@block vertex_data)
+    vnorms = PhysicalBuffer{Vec3}(length(vertex_normals), @address(@block vertex_normals))
+    vdata = VD === Nothing ? DeviceAddress(0) : @address(@block vertex_data)
     pdata = PT === Nothing ? DeviceAddress(0) : @address(@block primitive_data)
     pinds = @address(@block primitive_indices)
     idata = IT === Nothing ? DeviceAddress(0) : @address(@block instance_data)

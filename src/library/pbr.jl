@@ -115,10 +115,11 @@ function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{Invo
     d² = distance2(position, light.position)
     color.rgb += scatter(pbr.bsdf, position, light_direction, normal, view) .* light.intensity .* light.attenuation/d² .* (normal ⋅ light_direction) .* light.color
   end
+  color.rgb = clamp.(color.rgb, 0F, 1F)
   color.a = 1F
 end
 user_data(pbr::PBR, ctx) = pbr
-interface(::Type{<:PBR}) = (Nothing, Nothing, Nothing)
+interface(::PBR) = Tuple{Nothing, Nothing, Nothing}
 
 function Program(::Type{PBR{T}}, device) where {T}
   vert = @vertex device pbr_vert(::Vec4::Output{Position}, ::Vec3::Output, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)

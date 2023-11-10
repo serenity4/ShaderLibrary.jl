@@ -1,8 +1,10 @@
 @testset "Rendering" begin
   @testset "Triangle" begin
     grad = Gradient()
-    vertices = [Vertex(Vec2(-0.4, -0.4), Vec3(1.0, 0.0, 0.0)), Vertex(Vec2(0.4, -0.4), Vec3(0.0, 1.0, 0.0)), Vertex(Vec2(0.0, 0.6), Vec3(0.0, 0.0, 1.0))]
-    primitive = Primitive(MeshEncoding(1:3), vertices, FACE_ORIENTATION_COUNTERCLOCKWISE)
+    vertex_locations = Vec2[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]
+    vertex_data = Vec3[(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)]
+    mesh = VertexMesh(1:3, vertex_locations; vertex_data)
+    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
     @test_throws "At least one color attachment" Command(grad, ShaderParameters(), device, primitive)
     command = Command(grad, parameters, device, primitive)
     render(device, command)
@@ -21,9 +23,11 @@
 
   @testset "Sprites" begin
     texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT)
+    vertex_locations = Vec2[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]
+    vertex_data = Vec2[(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)]
+    mesh = VertexMesh(1:3, vertex_locations; vertex_data)
     sprite = Sprite(texture)
-    vertices = [Vertex(Vec2(-0.4, -0.4), Vec2(0.0, 0.0)), Vertex(Vec2(0.4, -0.4), Vec2(1.0, 0.0)), Vertex(Vec2(0.0, 0.6), Vec2(0.5, 1.0))]
-    primitive = Primitive(MeshEncoding(1:3), vertices, FACE_ORIENTATION_COUNTERCLOCKWISE)
+    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
     render(device, sprite, parameters, primitive)
     data = collect(color, device)
     save_test_render("sprite_triangle.png", data, 0x231cf3602440b50c)
@@ -45,8 +49,10 @@
 
   @testset "Blur" begin
     texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT, name = :normal_map)
-    vertices = [Vertex(Vec2(-0.4, -0.4), Vec2(0.0, 0.0)), Vertex(Vec2(0.4, -0.4), Vec2(1.0, 0.0)), Vertex(Vec2(0.0, 0.6), Vec2(0.5, 1.0))]
-    primitive = Primitive(MeshEncoding(1:3), vertices, FACE_ORIENTATION_COUNTERCLOCKWISE)
+    vertex_locations = Vec2[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]
+    vertex_data = Vec2[(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)]
+    mesh = VertexMesh(1:3, vertex_locations; vertex_data)
+    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
 
     directional_blur = GaussianBlurDirectional(texture, BLUR_HORIZONTAL, 0.02)
     render(device, directional_blur, parameters, primitive)
@@ -77,7 +83,7 @@
 
     render(device, Text(text, font, options), parameters, (-1, 0))
     data = collect(color, device)
-    save_test_render("text.png", data)
+    save_test_render("text.png", data, 0x18a71da4d048546b)
 
     font = OpenTypeFont(font_file("NotoSerifLao.ttf"));
     options = FontOptions(ShapingOptions(tag"lao ", tag"dflt"; enabled_features = Set([tag"aalt"])), 1/2)
@@ -113,7 +119,7 @@
                   (0.16, 0.01, 0.53),
                   (0.49, 0.05, 0.38)]
     mesh = read_mesh("cube.gltf")
-    mesh = VertexMesh(mesh.encoding, Vertex.(mesh.vertex_attributes, colors))
+    mesh = VertexMesh(mesh.encoding, mesh.vertex_locations; mesh.vertex_normals, vertex_data = colors)
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(Plane((1, 0, 1)), 0.3pi)))
     grad = Gradient()
     camera = Camera(focal_length = 2, near_clipping_plane = -2)
@@ -130,5 +136,14 @@
     pbr = PBR(bsdf, PhysicalBuffer{PointLight}(length(lights), lights_buffer))
     prog = Program(typeof(pbr), device)
     @test isa(prog, Program)
+
+    mesh = read_mesh("cube.gltf")
+    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(Plane((1, 0, 1)), 0.3pi)))
+    camera = Camera(focal_length = 2, near_clipping_plane = -2)
+    cube_parameters = setproperties(parameters, (; camera))
+
+    render(device, pbr, cube_parameters, primitive)
+    data = collect(color, device)
+    save_test_render("shaded_cube_pbr.png", data)
   end
 end;

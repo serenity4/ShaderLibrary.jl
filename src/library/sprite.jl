@@ -23,7 +23,7 @@ function Program(::Type{Sprite}, device)
   Program(vert, frag)
 end
 
-interface(::Sprite) = Tuple{Vec2,Nothing,Nothing}
+interface(::Sprite) = Tuple{Vector{Vec2},Nothing,Nothing}
 user_data(sprite::Sprite, ctx) = DescriptorIndex(texture_descriptor(sprite.texture), ctx)
 resource_dependencies(sprite::Sprite) = @resource_dependencies begin
   @read sprite.texture.image::Texture

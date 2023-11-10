@@ -75,5 +75,5 @@ function Program(::Type{QuadraticBezierFill}, device)
   Program(vert, frag)
 end
 
-interface(::QuadraticBezierFill) = Tuple{Vec2,QuadraticBezierPrimitiveData,Nothing}
+interface(::QuadraticBezierFill) = Tuple{Vector{Vec2},QuadraticBezierPrimitiveData,Nothing}
 user_data(qbf::QuadraticBezierFill, ctx) = qbf.curves

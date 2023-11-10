@@ -15,4 +15,4 @@ function Program(::Type{Gradient}, device)
   Program(vert, frag)
 end
 
-interface(::Gradient) = Tuple{Vec3,Nothing,Nothing}
+interface(::Gradient) = Tuple{Vector{Vec3},Nothing,Nothing}

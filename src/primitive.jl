@@ -1,33 +1,16 @@
-struct Vertex{T}
-  location::Vec3
-  data::T
-end
-Vertex(location, data = nothing) = Vertex(vec3(location), data)
-
-GeometryExperiments.location(vertex::Vertex) = vertex.location
-
-struct Primitive{PT,VT}
-  mesh::VertexMesh{UInt32,Vertex{VT},Vector{Vertex{VT}}}
+struct Primitive{PT,VL,VN,VD}
+  mesh::VertexMesh{UInt32,VL,VN,VD}
   orientation::FaceOrientation
   "World-space transform."
   transform::Transform
   data::PT
-  function Primitive{PT,VT}(mesh, orientation, transform, data) where {PT,VT}
-    mesh = convert(VertexMesh{UInt32,Vertex{VT},Vector{Vertex{VT}}}, mesh)
-    orientation = convert(FaceOrientation, orientation)
-    transform = convert(Transform, transform)
-    data = convert(PT, data)
-    new{PT,VT}(mesh, orientation, transform, data)
-  end
 end
 
-Primitive(mesh::VertexMesh{<:Any,Vertex{T}}, orientation::FaceOrientation; transform::Transform = Transform(), data = nothing) where {T} = Primitive{typeof(data),T}(mesh, orientation, transform, data)
-function Primitive(encoding::MeshEncoding, vertices::AbstractVector{Vertex{VT}}, orientation, transform = Transform(), data::PT = nothing) where {VT,PT}
-  encoding = convert(MeshEncoding{UInt32}, encoding)
-  Primitive{PT,VT}(VertexMesh(encoding, vertices), orientation, transform, data)
-end
+Primitive(mesh::VertexMesh{<:Any,VL,VN,VD}, orientation::FaceOrientation; transform::Transform = Transform(), data = nothing) where {VL,VN,VD} = Primitive{typeof(data),VL,VN,VD}(mesh, orientation, transform, data)
 
-struct Instance{IT,PT,VT,V<:AbstractVector{Primitive{PT,VT}}}
+Base.convert(::Type{T}, primitive::Primitive) where {T<:Primitive} = T(primitive.mesh, primitive.orientation, primitive.transform, primitive.data)
+
+struct Instance{IT,PT,VD,V<:AbstractVector{<:Primitive{PT,<:Any,<:Any,VD}}}
   primitives::V
   "World-space transform."
   transform::Transform

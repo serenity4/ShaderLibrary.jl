@@ -11,6 +11,6 @@ end
 
 Primitive(rect::Rectangle, location) = Primitive(rect, Transform(translation = vec3(location)))
 function Primitive(rect::Rectangle, transform::Transform = Transform())
-  vertices = Vertex.(Vec2.(PointSet(rect.geometry).points), rect.vertex_data)
-  Primitive(MeshEncoding(1:4), vertices, FACE_ORIENTATION_COUNTERCLOCKWISE, transform, rect.primitive_data)
+  mesh = VertexMesh(1:4, PointSet(rect.geometry); rect.vertex_data)
+  Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform, data = rect.primitive_data)
 end

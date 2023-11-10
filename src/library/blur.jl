@@ -56,7 +56,7 @@ user_data(blur::GaussianBlurDirectional, ctx) = (blur.direction, blur.size, Desc
 resource_dependencies(blur::GaussianBlurDirectional) = @resource_dependencies begin
   @read blur.texture.image::Texture
 end
-interface(::GaussianBlurDirectional) = Tuple{Vec2,Nothing,Nothing}
+interface(::GaussianBlurDirectional) = Tuple{Vector{Vec2},Nothing,Nothing}
 
 struct GaussianBlur <: GraphicsShaderComponent
   texture::Texture
