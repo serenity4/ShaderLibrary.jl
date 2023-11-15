@@ -1,8 +1,8 @@
 struct Gradient <: Material end
 
 function gradient_vert(position, color, index, (; data)::PhysicalRef{InvocationData})
-  position.xyz = world_to_screen_coordinates(data.vertex_locations[index], data)
-  color.rgb = @load data.vertex_data[index]::Vec3
+  position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1U], data)
+  color.rgb = @load data.vertex_data[index + 1U]::Vec3
 end
 
 function gradient_frag(color_output, color_input)

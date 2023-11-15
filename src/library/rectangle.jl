@@ -9,7 +9,7 @@ struct Rectangle{VT,PT,V<:AbstractVector{VT}}
   Rectangle(semidiag::Point, vertex_data::Union{AbstractVector,Nothing}, primitive_data) = Rectangle(Box{2,Float32}(semidiag), vertex_data, primitive_data)
 end
 
-Primitive(rect::Rectangle, location) = Primitive(rect, Transform(translation = vec3(location)))
+Primitive(rect::Rectangle, location) = Primitive(rect, Transform(translation = Translation(point3(location))))
 function Primitive(rect::Rectangle, transform::Transform = Transform())
   mesh = VertexMesh(1:4, PointSet(rect.geometry); rect.vertex_data)
   Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform, data = rect.primitive_data)

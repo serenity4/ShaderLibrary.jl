@@ -38,7 +38,7 @@ function glyph_quads(line::Line, segment::LineSegment, origin::Point{3})
       start:stop
     end
 
-    quad_data = QuadraticBezierPrimitiveData(range .- 1, 20options.font_size.value, color)
+    quad_data = QuadraticBezierPrimitiveData(range, 20options.font_size.value, color)
     rect = Rectangle(box, vertex_data, quad_data)
     push!(quads, Primitive(rect, position + origin))
   end

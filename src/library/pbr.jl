@@ -88,21 +88,14 @@ function scatter(bsdf::BSDF{T}, position, light_direction, normal, view) where {
   brdf .* btdf
 end
 
-struct PointLight
-  position::Vec3
-  color::Vec3
-  intensity::Float32
-  attenuation::Float32
-end
-
 struct PBR{T} <: Material
   bsdf::BSDF{T}
-  lights::PhysicalBuffer{PointLight} 
+  lights::PhysicalBuffer{Light} 
 end
 
 function pbr_vert(position, frag_position, frag_normal, index, (; data)::PhysicalRef{InvocationData})
-  frag_position[] = data.vertex_locations[index]
-  frag_normal[] = data.vertex_normals[index]
+  frag_position[] = data.vertex_locations[index + 1U]
+  frag_normal[] = data.vertex_normals[index + 1U]
   position.xyz = world_to_screen_coordinates(frag_position, data)
 end
 
@@ -111,9 +104,8 @@ function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{Invo
   pbr = @load data.user_data::PBR{T}
   for light in pbr.lights
     light_direction = position - light.position
-    view = normalize(position - camera.transform.translation)
-    d² = distance2(position, light.position)
-    color.rgb += scatter(pbr.bsdf, position, light_direction, normal, view) .* light.intensity .* light.attenuation/d² .* (normal ⋅ light_direction) .* light.color
+    view = normalize(camera.transform.translation(position))
+    color.rgb += scatter(pbr.bsdf, position, light_direction, normal, view) .* intensity(light, position, normal) .* light.color
   end
   color.rgb = clamp.(color.rgb, 0F, 1F)
   color.a = 1F

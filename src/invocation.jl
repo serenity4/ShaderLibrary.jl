@@ -10,7 +10,7 @@ struct PhysicalBuffer{T}
 end
 
 Base.getindex(buffer::PhysicalBuffer{T}, i) where {T} = @load buffer.address[unsigned_index(i)]::T
-Base.iterate(buffer::PhysicalBuffer) = iterate(buffer, 0U)
+Base.iterate(buffer::PhysicalBuffer) = iterate(buffer, 1U)
 function Base.iterate(buffer::PhysicalBuffer{T}, i) where {T}
   i > buffer.size && return nothing
   (buffer[i], i + one(i))
@@ -22,13 +22,13 @@ Base.length(buffer::PhysicalBuffer) = buffer.size
 PhysicalBuffer{T}(size::Integer, buffer::Buffer) where {T} = PhysicalBuffer{T}(size, DeviceAddress(buffer))
 
 @struct_hash_equal struct InvocationData
-  vertex_locations::PhysicalBuffer{Vec3} # indexed by vertex index
+  vertex_locations::PhysicalBuffer{Vec3} # indexed by `VertexIndex + 1`
   "Vertex normals in object space."
-  vertex_normals::PhysicalBuffer{Vec3} # indexed by vertex index
-  vertex_data::DeviceAddress # optional vector indexed by vertex index
+  vertex_normals::PhysicalBuffer{Vec3} # indexed by `VertexIndex + 1`
+  vertex_data::DeviceAddress # optional vector indexed by `VertexIndex + 1`
   primitive_data::DeviceAddress # optional vector indexed by primitive index
-  primitive_indices::DeviceAddress # primitive index by vertex index
-  instance_data::DeviceAddress # optional vector indexed by InstanceIndex
+  primitive_indices::DeviceAddress # primitive index by `VertexIndex + 1`
+  instance_data::DeviceAddress # optional vector indexed by `InstanceIndex + 1`
   user_data::DeviceAddress # user-defined data
   camera::Camera # provided as a shader parameter
   aspect_ratio::Float32 # computed from a "reference" attachment (i.e. the color attachment in most cases)
@@ -63,7 +63,7 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
       VD !== Nothing && append!(vertex_data, mesh.vertex_data)
       append!(vertex_locations, apply_transform(vec3(location), primitive.transform) for location in mesh.vertex_locations)
       append!(vertex_normals, @something(mesh.vertex_normals, Vec3(1, 0, 0) for _ in 1:nv(mesh)))
-      append!(primitive_indices, i - 1 for _ in 1:nv(mesh))
+      append!(primitive_indices, i * ones(nv(mesh)))
       PT !== Nothing && push!(primitive_data, primitive.data)
     end
     IT !== Nothing && push!(instance_data, instance.data)

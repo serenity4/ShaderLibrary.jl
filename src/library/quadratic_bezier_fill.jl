@@ -37,10 +37,10 @@ function classify_bezier_curve(points)
   (0x2e74 >> rshift) & 0x0003
 end
 
-function intensity(position, curves::DeviceAddress, range, pixel_per_em)
+function intensity(position, curves, range, pixel_per_em)
   res = 0F
-  for i in range
-    curve = BezierCurve((@load curves[i]::Arr{3,Vec2}) .- Ref(position))
+  for curve in curves
+    curve = BezierCurve(curve .- Ref(position))
     res += intensity(curve, pixel_per_em)
   end
   sqrt(abs(res))
@@ -57,14 +57,15 @@ struct QuadraticBezierPrimitiveData
 end
 
 function quadratic_bezier_fill_vert(position, frag_coordinates, frag_primitive_index::Vec{2,UInt32}, index, (; data)::PhysicalRef{InvocationData})
-  position.xyz = world_to_screen_coordinates(data.vertex_locations[index], data)
-  frag_coordinates[] = @load data.vertex_data[index]::Vec2
-  frag_primitive_index.x = @load data.primitive_indices[index]::UInt32
+  position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1U], data)
+  frag_coordinates[] = @load data.vertex_data[index + 1U]::Vec2
+  frag_primitive_index.x = @load data.primitive_indices[index + 1U]::UInt32
 end
 
 function quadratic_bezier_fill_frag(out_color, coordinates, primitive_index, (; data)::PhysicalRef{InvocationData})
-  curves = data.user_data # Vector{Arr{3,Vec2}}
   (; color, range, sharpness) = @load data.primitive_data[primitive_index.x]::QuadraticBezierPrimitiveData
+  curves_start = DeviceAddress(UInt64(data.user_data) + 24*(first(range) - 1U))
+  curves = PhysicalBuffer{Arr{3,Vec2}}(length(range), curves_start)
   out_color.rgb = color
   out_color.a = clamp(intensity(coordinates, curves, range, 10sharpness), 0F, 1F)
 end

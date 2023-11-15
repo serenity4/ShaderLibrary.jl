@@ -3,8 +3,8 @@ struct Sprite <: Material
 end
 Sprite(image::Resource) = Sprite(default_texture(image))
 function sprite_vert(position, uv, index, (; data)::PhysicalRef{InvocationData})
-  position.xyz = world_to_screen_coordinates(data.vertex_locations[index], data)
-  uv[] = @load data.vertex_data[index]::Vec2
+  position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1U], data)
+  uv[] = @load data.vertex_data[index + 1U]::Vec2
 end
 
 function sprite_frag(color, uv, (; data)::PhysicalRef{InvocationData}, textures)
