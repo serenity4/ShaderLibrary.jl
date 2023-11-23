@@ -9,6 +9,7 @@ using SPIRV: @compile, validate, F, U, Vec3, Vec2, unwrap
 using Erosion
 using OpenType
 using FileIO: load, save
+using SPIRV
 
 import GLTF
 
