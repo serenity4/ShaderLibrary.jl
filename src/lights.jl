@@ -4,8 +4,6 @@
   LIGHT_TYPE_DIRECTION = 3
 end
 
-SPIRV.primitive_type_to_spirv(::Type{LightType}) = SPIRV.IntegerType(32, false)
-
 struct Light
   type::LightType
   position::Vec3

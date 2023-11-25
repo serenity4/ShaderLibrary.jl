@@ -18,7 +18,6 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SPIRV = "84138a67-b342-4d33-8200-33cfcca52eb2"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StructEquality = "6ec83bb0-ed9f-11e9-3b4c-2b04cb4e219c"
-SymbolicGA = "be1275fb-6550-422f-8b88-a5943ccecfb8"
 
 [compat]
 GeometryExperiments = "0.4"

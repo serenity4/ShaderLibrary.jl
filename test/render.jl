@@ -134,9 +134,8 @@
     lights = [Light(LIGHT_TYPE_POINT, (2.0, 1.0, 1.0), (1.0, 1.0, 1.0), 1.0, 1.0)]
     lights_buffer = Buffer(device; data = lights)
     pbr = PBR(bsdf, PhysicalBuffer{Light}(length(lights), lights_buffer))
-    # FIXME: The dot product defined on static vectors is not compatible with SPIR-V compilation.
-    # prog = Program(typeof(pbr), device)
-    # @test isa(prog, Program)
+    prog = Program(typeof(pbr), device)
+    @test isa(prog, Program)
 
     # gltf = read_gltf("blob.gltf");
     # lights = ShaderLibrary.read_lights(gltf)

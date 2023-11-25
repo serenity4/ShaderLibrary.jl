@@ -9,7 +9,7 @@ struct PhysicalBuffer{T}
   address::DeviceAddress
 end
 
-Base.getindex(buffer::PhysicalBuffer{T}, i) where {T} = @load buffer.address[unsigned_index(i)]::T
+Base.getindex(buffer::PhysicalBuffer{T}, i) where {T} = @load buffer.address[i]::T
 Base.iterate(buffer::PhysicalBuffer) = iterate(buffer, 1U)
 function Base.iterate(buffer::PhysicalBuffer{T}, i) where {T}
   i > buffer.size && return nothing
