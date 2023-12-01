@@ -36,7 +36,7 @@ include("library/blur.jl")
 include("library/quadratic_bezier_fill.jl")
 include("library/text.jl")
 include("library/pbr.jl")
-# include("library/erosion.jl")
+include("library/erosion.jl")
 
 include("gltf.jl")
 

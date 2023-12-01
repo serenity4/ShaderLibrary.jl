@@ -23,5 +23,5 @@ parameters = ShaderParameters(color)
     include("scene.jl")
     include("pbr.jl")
     include("render.jl")
-    # include("compute.jl")
+    include("compute.jl")
 end;
