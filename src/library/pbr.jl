@@ -139,3 +139,65 @@ function Program(::Type{PBR{T}}, device) where {T}
   )
   Program(vert, frag)
 end
+
+
+
+
+# ----------------------------------
+# https://learnopengl.com/PBR/Theory
+
+"""
+Approximates the amount the surface's microfacets are aligned to the halfway vector, influenced by the roughness of the surface.
+
+- `α`: roughness of the surface
+- `sᵥ`: shape factor between the view direction and the surface normal.
+"""
+microfacet_scatter(α, sᵥ) = microfacet_scatter_trowbridge_reitz_ggx(α, sᵥ)
+
+function microfacet_scatter_trowbridge_reitz_ggx(α, sᵥ)
+  α² = α^2
+  α² / ((π)F * (sᵥ^2 * (α² - 1) + 1)^2)
+end
+
+"""
+Describes the self-shadowing property of the microfacets. When a surface is relatively rough, the surface's microfacets can overshadow other microfacets reducing the light the surface reflects.
+
+- `k`: remapped roughness, depending on whether direct or image-based lighting is used.
+- `s`: shape factor between a direction of interest and the surface normal.
+"""
+microfacet_occlusion_factor(k, s) = microfacet_occlusion_factor_schlick_ggx(k, s)
+microfacet_occlusion_factor_schlick_ggx(k, s) = s / lerp(one(k), s, k)
+function microfacet_occlusion_factor(k, sᵥ, sₗ)
+  fᵥ = microfacet_occlusion_factor(k, sᵥ)
+  fₗ = microfacet_occlusion_factor(k, sₗ)
+  fᵥ * fₗ
+end
+
+remap_roughness_direct_lighting(α) = (α + 1)^2/8
+remap_roughness_image_based_lighting(α) = α^2/2
+
+"""
+Describes the ratio of surface reflection at different surface angles.
+
+Uses the Fresnel equation, which interpolates between an incident factor f₀ and a tangent factor f₉₀ (often taken to be zero - no light reflected for a tangential ray).
+"""
+surface_reflection(s, f₀)
+surface_reflection_fresnel(s, f₀) = lerp(one(s), pow5(one(s) - s), f₀)
+
+"""
+- `α`: roughness factor.
+- `sᵥ`: shape factor between surface normal and view direction.
+- `sₗ`: shape factor between surface normal and light direction.
+- `sₕ`: half-way shape factor between view direction and light direction.
+- `f₀`: reflectivity at incidence, based on indices of refraction (1 = reflects all light, 0 = absorbs all light).
+"""
+function cook_torrance_specular(α, sᵥ, sₗ, sₕ, f₀)
+  d = microfacet_scatter(α, sᵥ)
+  k = remap_roughness_direct_lighting(α) # change for image-based lighting
+  f = microfacet_occlusion_factor(k, sᵥ, sₗ)
+  sₕ = 
+  g = surface_reflection(sₕ, f₀)
+  d * f * g / (4 * sᵥ * sᵢ)
+end
+
+# ----------------------------------
