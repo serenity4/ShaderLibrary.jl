@@ -17,12 +17,12 @@
   end
 
   @testset "Lights" begin
-    light = Light(LIGHT_TYPE_POINT, (1.0, 1.0, 1.0), (0.8, 0.8, 0.8), 1000.0, 1.0)
+    light = Light{Float32}(LIGHT_TYPE_POINT, (1.0, 1.0, 1.0), (0.8, 0.8, 0.8), 1000.0)
     normal = normalize(light.position) # full incidence
-    position = zero(Vec3)
-    value = ShaderLibrary.intensity(light, position, normal)
-    @test isa(value, Float32)
-    @test value > 0
+    position = zero(Point3f)
+    value = ShaderLibrary.radiance(light, position)
+    @test isa(value, Point3f)
+    @test all(value .> 0)
   end
 
   @testset "GLTF imports" begin
@@ -36,6 +36,6 @@
     @test length(lights) == 1
     light = lights[1]
     @test isa(light, Light)
-    @test light.position == Vec3(4.0256276, 4.5642242, -0.28052378)
+    @test light.position == Point3f(4.0256276, 4.5642242, -0.28052378)
   end
 end;

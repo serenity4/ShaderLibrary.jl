@@ -16,7 +16,7 @@ function read_camera(gltf::GLTF.Object)
   Camera(gltf, gltf.nodes[only(cameras) - 1])
 end
 
-function Light(gltf::GLTF.Object, node::GLTF.Node)
+function Light{Float32}(gltf::GLTF.Object, node::GLTF.Node)
   tr = Transform(node)
   position = apply_transform(zero(Point3f), tr)
   i = node.extensions["KHR_lights_punctual"]["light"]
@@ -24,9 +24,7 @@ function Light(gltf::GLTF.Object, node::GLTF.Node)
   type = light_type(light["type"])
   color = Point3f(light["color"])
   intensity = light["intensity"]
-  # XXX: What value to put here?
-  attenuation = 1.0
-  Light(type, position, color, intensity, attenuation)
+  Light{Float32}(type, position, color, intensity)
 end
 
 function light_type(type::AbstractString)
@@ -37,12 +35,12 @@ function light_type(type::AbstractString)
 end
 
 function read_lights(gltf::GLTF.Object)
-  lights = Light[]
+  lights = Light{Float32}[]
   !haskey(gltf.extensions, "KHR_lights_punctual")
   for node in gltf.nodes
     isnothing(node.extensions) && continue
     haskey(node.extensions, "KHR_lights_punctual") || continue
-    push!(lights, Light(gltf, node))
+    push!(lights, Light{Float32}(gltf, node))
   end
   lights
 end

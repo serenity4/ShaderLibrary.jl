@@ -131,9 +131,9 @@
 
   @testset "PBR" begin
     bsdf = BSDF{Float32}((1.0, 1.0, 1.0), 0.0, 0.1, 0.5)
-    lights = [Light(LIGHT_TYPE_POINT, (2.0, 1.0, 1.0), (1.0, 1.0, 1.0), 1.0, 1.0)]
+    lights = [Light{Float32}(LIGHT_TYPE_POINT, (2.0, 1.0, 1.0), (1.0, 1.0, 1.0), 1.0)]
     lights_buffer = Buffer(device; data = lights)
-    pbr = PBR(bsdf, PhysicalBuffer{Light}(length(lights), lights_buffer))
+    pbr = PBR(bsdf, PhysicalBuffer{Light{Float32}}(length(lights), lights_buffer))
     prog = Program(typeof(pbr), device)
     @test isa(prog, Program)
 

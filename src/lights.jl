@@ -4,19 +4,19 @@
   LIGHT_TYPE_DIRECTION = 3
 end
 
-struct Light
+struct Light{T}
   type::LightType
-  position::Point3f
-  color::SVector{3,Float32}
-  intensity::Float32
-  attenuation::Float32
+  position::Point{3,T}
+  color::SVector{3,T}
+  intensity::T
 end
 
-function intensity(light, position, normal)
+function radiance(light::Light{T}, at::Point{3}) where {T}
   if light.type == LIGHT_TYPE_POINT
-    d² = distance2(position, light.position)
-    light.intensity .* light.attenuation/d² .* (normal ⋅ normalize(light.position - position))
+    d² = distance2(at, light.position)
+    attenuation = light.intensity / d²
+    light.color .* attenuation
   else
-    0F
+    zero(SVector{3,T})
   end
 end

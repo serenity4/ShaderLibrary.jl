@@ -48,7 +48,7 @@ function brdf_diffuse_disney(α, n, v, l, h, f₀)
   light_scatter .* view_scatter ./ (π)F
 end
 
-brdf_diffuse_lambertian(c) = c / (π)F
+brdf_diffuse_lambertian(albedo) = albedo / (π)F
 
 # Parametrization as described in Section 4.8 of https://google.github.io/filament/Filament.html
 struct BSDF{T<:Real}
@@ -76,7 +76,8 @@ const METAL_COLORS = Dict{Symbol,Vec3}(
   :copper => (0.97, 0.74, 0.62),
 )
 
-function scattering(bsdf::BSDF{T}, position, light_direction, normal, view) where {T}
+function scattering(bsdf::BSDF{T}, position, light::Light, normal, view) where {T}
+  light_direction = normalize(position - light.position)
   diffuse_color = (1 .- bsdf.metallic) .* bsdf.base_color
   roughness = max(bsdf.roughness, T(0.089))^2
   f₀ = T(0.16) * bsdf.reflectance^2 * (one(T) - bsdf.metallic) .+ bsdf.base_color .* bsdf.metallic
@@ -93,9 +94,10 @@ function scattering(bsdf::BSDF{T}, position, light_direction, normal, view) wher
 end
 
 function scatter_light_source(bsdf::BSDF, position, normal, light::Light, view)
+  factor = scattering(bsdf, position, light, normal, view)
   light_direction = normalize(position - light.position)
-  factor = scattering(bsdf, position, light_direction, normal, view)
-  factor .* intensity(light, position, normal) .* light.color
+  sₗ = shape_factor(normal, light_direction)
+  factor .* radiance(light, position) .* sₗ
 end
 
 function scatter_light_sources(bsdf::BSDF{T}, position, normal, lights, camera::Camera) where {T}
@@ -109,7 +111,7 @@ end
 
 struct PBR{T} <: Material
   bsdf::BSDF{T}
-  lights::PhysicalBuffer{Light} 
+  lights::PhysicalBuffer{Light{T}}
 end
 
 function pbr_vert(position, frag_position, frag_normal, index, (; data)::PhysicalRef{InvocationData})
@@ -150,13 +152,13 @@ end
 Approximates the amount the surface's microfacets are aligned to the halfway vector, influenced by the roughness of the surface.
 
 - `α`: roughness of the surface
-- `sᵥ`: shape factor between the view direction and the surface normal.
+- `sₕ`: shape factor between the halfway direction and the surface normal.
 """
-microfacet_scatter(α, sᵥ) = microfacet_scatter_trowbridge_reitz_ggx(α, sᵥ)
+microfacet_scattering(α, sₕ) = microfacet_scattering_trowbridge_reitz_ggx(α, sₕ)
 
-function microfacet_scatter_trowbridge_reitz_ggx(α, sᵥ)
+function microfacet_scattering_trowbridge_reitz_ggx(α, sₕ)
   α² = α^2
-  α² / ((π)F * (sᵥ^2 * (α² - 1) + 1)^2)
+  α² / ((π)F * (sₕ^2 * (α² - 1) + 1)^2)
 end
 
 """
@@ -181,8 +183,8 @@ Describes the ratio of surface reflection at different surface angles.
 
 Uses the Fresnel equation, which interpolates between an incident factor f₀ and a tangent factor f₉₀ (often taken to be zero - no light reflected for a tangential ray).
 """
-surface_reflection(s, f₀)
-surface_reflection_fresnel(s, f₀) = lerp(one(s), pow5(one(s) - s), f₀)
+surface_reflection(s, f₀) = surface_reflection_fresnel(s, f₀)
+surface_reflection_fresnel(s, f₀) = lerp(one(s), pow5(clamp(one(s) - s, zero(s), one(s))), f₀)
 
 """
 - `α`: roughness factor.
@@ -191,13 +193,42 @@ surface_reflection_fresnel(s, f₀) = lerp(one(s), pow5(one(s) - s), f₀)
 - `sₕ`: half-way shape factor between view direction and light direction.
 - `f₀`: reflectivity at incidence, based on indices of refraction (1 = reflects all light, 0 = absorbs all light).
 """
-function cook_torrance_specular(α, sᵥ, sₗ, sₕ, f₀)
-  d = microfacet_scatter(α, sᵥ)
+function cook_torrance_specular_brdf(α, sᵥ, sₗ, sₕ)
+  # Use `α^2` as roughness value to give more realistic results.
+  d = microfacet_scattering(α^2, sₕ)
   k = remap_roughness_direct_lighting(α) # change for image-based lighting
   f = microfacet_occlusion_factor(k, sᵥ, sₗ)
-  sₕ = 
-  g = surface_reflection(sₕ, f₀)
-  d * f * g / (4 * sᵥ * sᵢ)
+  d * f / (4 * sᵥ * sₗ + convert(typeof(α), 0.0001))
+end
+
+shape_factor(x::AbstractVector{T}, y::AbstractVector{T}) where {T} = max(x ⋅ y, zero(T))
+
+function compute_lighting(bsdf::BSDF{T}, position, normal, light::Light, view) where {T}
+  sᵥ = shape_factor(normal, view)
+  light_direction = normalize(position - light.position)
+  sₗ = shape_factor(normal, light_direction)
+  halfway_direction = normalize(light_direction + view)
+  sₕ = shape_factor(normal, halfway_direction)
+  # f₀ = T(0.16) * bsdf.reflectance^2 * (one(T) - bsdf.metallic) .+ bsdf.base_color .* bsdf.metallic
+  f₀ = lerp(@SVector(ones(T, 3)), bsdf.base_color, bsdf.metallic)
+  α = bsdf.roughness
+  specular = cook_torrance_specular_brdf(bsdf.roughness, sᵥ, sₗ, sₕ)
+  kₛ = surface_reflection(max(halfway_direction ⋅ view, zero(T)), f₀)
+  diffuse = kₛ .* brdf_diffuse_lambertian(bsdf.base_color)
+  kd = (@SVector(ones(T, 3)) .- kₛ) .* (one(T) - bsdf.metallic)
+  brdf = kₛ .* specular .+ kd .* diffuse
+  btdf = one(T)
+  scattering = brdf .* btdf
+  radiance(light, position) .* sₗ .* scattering
+end
+
+function compute_lighting(bsdf::BSDF{T}, position, normal, lights, camera::Camera) where {T}
+  res = zero(Point{3,T})
+  view = normalize(position - camera.transform.translation.vec)
+  for light in lights
+    res += compute_lighting(bsdf, position, normal, light, view)
+  end
+  res
 end
 
 # ----------------------------------
