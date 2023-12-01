@@ -1,10 +1,3 @@
-function Transform(node::GLTF.Node)
-  rotation = Rotation(Vec4(node.rotation))
-  translation = Vec3(node.translation)
-  scaling = Vec3(node.scale)
-  Transform(; translation, rotation, scaling)
-end
-
 function Camera(gltf::GLTF.Object, node::GLTF.Node)
   transform = Transform(node)
   camera = gltf.cameras[node.camera]
@@ -25,11 +18,11 @@ end
 
 function Light(gltf::GLTF.Object, node::GLTF.Node)
   tr = Transform(node)
-  position = apply_transform(zero(Vec3), tr)
+  position = apply_transform(zero(Point3f), tr)
   i = node.extensions["KHR_lights_punctual"]["light"]
   light = gltf.extensions["KHR_lights_punctual"]["lights"][i + 1]
   type = light_type(light["type"])
-  color = Vec3(light["color"])
+  color = Point3f(light["color"])
   intensity = light["intensity"]
   # XXX: What value to put here?
   attenuation = 1.0

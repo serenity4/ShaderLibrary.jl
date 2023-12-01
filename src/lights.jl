@@ -6,8 +6,8 @@ end
 
 struct Light
   type::LightType
-  position::Vec3
-  color::Vec3
+  position::Point3f
+  color::SVector{3,Float32}
   intensity::Float32
   attenuation::Float32
 end
@@ -15,7 +15,7 @@ end
 function intensity(light, position, normal)
   if light.type == LIGHT_TYPE_POINT
     d² = distance2(position, light.position)
-    light.intensity .* light.attenuation/d² .* (normal ⋅ normalize(position - light.position))
+    light.intensity .* light.attenuation/d² .* (normal ⋅ normalize(light.position - position))
   else
     0F
   end

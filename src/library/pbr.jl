@@ -6,7 +6,7 @@
 # f   | BRDF
 # fd  | Diffuse component of a BRDF
 # fᵣ  | Specular component of a BRDF
-# α   | Roughness, remapped from using input perceptualRoughness
+# α   | Roughness, remapped from perceptual roughness
 # σ   | Diffuse reflectance
 # Ω   | Spherical domain
 # f₀  | Reflectance at normal incidence
@@ -23,7 +23,7 @@ function specular_visibility_smith_ggx_correlated(α, n, v, l)
   α² = α^2
   ggx_v = (n ⋅ l) * sqrt((n ⋅ v)^2 * (1 - α²) + α²)
   ggx_l = (n ⋅ v) * sqrt((n ⋅ l)^2 * (1 - α²) + α²)
-  0.5 / (ggx_v + ggx_l)
+  0.5F / (ggx_v + ggx_l)
 end
 
 # https://google.github.io/filament/Filament.html#listing_approximatedspecularv
@@ -35,9 +35,9 @@ end
 
 pow5(x) = x * (x * x)^2
 # https://google.github.io/filament/Filament.html#listing_specularf
-fresnel_schlick(u, f₀, f₉₀) = f₀ + (f₉₀ .- f₀) * pow5(1 - u)
+fresnel_schlick(cosθ, f₀, f₉₀) = f₀ + (f₉₀ .- f₀) * pow5(1 - cosθ)
 
-brdf_specular(α, n, h, v, l, u, f₀, f₉₀) = specular_normal_distribution_ggx_fp32(α, n, h) * specular_visibility_smith_ggx_correlated(α, n, v, l) * fresnel_schlick(u, f₀, f₉₀)
+brdf_specular(α, n, h, v, l, cosθ, f₀, f₉₀) = specular_normal_distribution_ggx_fp32(α, n, h) * specular_visibility_smith_ggx_correlated(α, n, v, l) * fresnel_schlick(cosθ, f₀, f₉₀)
 
 # https://google.github.io/filament/Filament.html#listing_diffusebrdf
 # Note: this is not energy-conserving.
@@ -48,12 +48,14 @@ function brdf_diffuse_disney(α, n, v, l, h, f₀)
   light_scatter .* view_scatter ./ (π)F
 end
 
+brdf_diffuse_lambertian(c) = c / (π)F
+
 # Parametrization as described in Section 4.8 of https://google.github.io/filament/Filament.html
 struct BSDF{T<:Real}
   # For metallic materials, use values with a luminosity of 67% to 100% (170-255 sRGB).
   # For non-metallic materials, values should be an sRGB value in the range 50-240 (strict range) or 30-240 (tolerant range).
   # Should be devoid of lighting information.
-  base_color::Vec{3,T}
+  base_color::SVector{3,T}
   # 0 = dielectric, 1 = metallic. Values in-between should remain close to 0 or to 1.
   metallic::T
   roughness::T # perceptual roughness
@@ -74,18 +76,35 @@ const METAL_COLORS = Dict{Symbol,Vec3}(
   :copper => (0.97, 0.74, 0.62),
 )
 
-function scatter(bsdf::BSDF{T}, position, light_direction, normal, view) where {T}
+function scattering(bsdf::BSDF{T}, position, light_direction, normal, view) where {T}
   diffuse_color = (1 .- bsdf.metallic) .* bsdf.base_color
   roughness = max(bsdf.roughness, T(0.089))^2
   f₀ = T(0.16) * bsdf.reflectance^2 * (one(T) - bsdf.metallic) .+ bsdf.base_color .* bsdf.metallic
   f₉₀ = one(T)
   h = normalize(view - light_direction) / T(2)
-  u = view ⋅ h
-  specular = brdf_specular(roughness, normal, h, view, light_direction, u, f₀, f₉₀)
-  diffuse = brdf_diffuse_disney(roughness, normal, view, light_direction, h, f₀)
+  cosθ = view ⋅ h
+  cosθ < zero(T) && return zero(Point{3,T})
+  specular = brdf_specular(roughness, normal, h, view, light_direction, cosθ, f₀, f₉₀)
+  diffuse = brdf_diffuse_lambertian(bsdf.base_color)
+  # diffuse = brdf_diffuse_disney(roughness, normal, view, light_direction, h, f₀)
   brdf = specular .* diffuse
-  btdf = zero(T) # XXX
+  btdf = one(T) # XXX
   brdf .* btdf
+end
+
+function scatter_light_source(bsdf::BSDF, position, normal, light::Light, view)
+  light_direction = normalize(position - light.position)
+  factor = scattering(bsdf, position, light_direction, normal, view)
+  factor .* intensity(light, position, normal) .* light.color
+end
+
+function scatter_light_sources(bsdf::BSDF{T}, position, normal, lights, camera::Camera) where {T}
+  res = zero(Point{3,T})
+  view = normalize(position - camera.transform.translation.vec)
+  for light in lights
+    res += scatter_light_source(bsdf, position, normal, light, view)
+  end
+  res
 end
 
 struct PBR{T} <: Material
@@ -102,12 +121,8 @@ end
 function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{InvocationData}) where {T}
   (; camera) = data
   pbr = @load data.user_data::PBR{T}
-  for light in pbr.lights
-    light_direction = position - light.position
-    view = normalize(camera.transform.translation(position))
-    color.rgb += scatter(pbr.bsdf, position, light_direction, normal, view) .* intensity(light, position, normal) .* light.color
-  end
-  color.rgb = clamp.(color.rgb, 0F, 1F)
+  scattered = scatter_light_sources(pbr.bsdf, SVector(position), SVector(normal), pbr.lights, camera)
+  color.rgb = clamp.(Vec3(scattered), 0F, 1F)
   color.a = 1F
 end
 user_data(pbr::PBR, ctx) = pbr

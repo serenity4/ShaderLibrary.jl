@@ -137,19 +137,13 @@
     prog = Program(typeof(pbr), device)
     @test isa(prog, Program)
 
-    # gltf = read_gltf("blob.gltf");
-    # lights = ShaderLibrary.read_lights(gltf)
-    # camera = ShaderLibrary.read_camera(gltf)
-    # mesh = VertexMesh(gltf)
-    # @test isa(mesh, VertexMesh)
-
     mesh = read_mesh("cube.gltf")
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(RotationPlane(1.0, 0.0, 1.0), 0.3π)))
     camera = Camera(focal_length = 2, near_clipping_plane = -2)
     cube_parameters = setproperties(parameters, (; camera))
 
-    # render(device, pbr, cube_parameters, primitive)
-    # data = collect(color, device)
-    # save_test_render("shaded_cube_pbr.png", data)
+    render(device, pbr, cube_parameters, primitive)
+    data = collect(color, device)
+    save_test_render("shaded_cube_pbr.png", data)
   end
 end;

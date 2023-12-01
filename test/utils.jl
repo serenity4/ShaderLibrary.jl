@@ -2,7 +2,7 @@ render_file(filename; tmp = false) = joinpath(@__DIR__, "renders", tmp ? "tmp" :
 texture_file(filename) = joinpath(@__DIR__, "textures", filename)
 font_file(filename) = joinpath(@__DIR__, "fonts", filename)
 gltf_file(filename) = joinpath(@__DIR__, "assets", filename)
-read_mesh(filename) = load_mesh_gltf(gltf_file(filename))
+read_mesh(filename) = VertexMesh(read_gltf(filename))
 read_texture(filename) = convert(Matrix{RGBA{Float16}}, load(texture_file("normal.png")))
 read_gltf(filename) = GLTF.load(gltf_file(filename))
 

@@ -72,7 +72,7 @@ end
 
 function Program(::Type{QuadraticBezierFill}, device)
   vert = @vertex device quadratic_bezier_fill_vert(::Vec4::Output{Position}, ::Vec2::Output, ::Vec{2,UInt32}::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
-  frag = @fragment device quadratic_bezier_fill_frag(::Vec4::Output, ::Vec2::Input, ::Vec{2,UInt32}::Input{@Flat}, ::PhysicalRef{InvocationData}::PushConstant)
+  frag = @fragment device quadratic_bezier_fill_frag(::Vec4::Output, ::Vec2::Input, ::SVector{2,UInt32}::Input{@Flat}, ::PhysicalRef{InvocationData}::PushConstant)
   Program(vert, frag)
 end
 
