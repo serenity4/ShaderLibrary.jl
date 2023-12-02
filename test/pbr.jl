@@ -6,15 +6,15 @@ using ShaderLibrary: scatter_light_sources, compute_lighting
   camera = read_camera(gltf)
   mesh = VertexMesh(gltf)
   mesh_transform = Transform(gltf.nodes[end])
-  i = last(findmax(v -> v.y, mesh.vertex_locations))
+  i = last(findmin(v -> distance2(lights[1].position, apply_transform(v, mesh_transform)), mesh.vertex_locations))
   position = apply_transform(mesh.vertex_locations[i], mesh_transform)
-  normal = apply_transform(mesh.vertex_normals[i], mesh_transform)
+  normal = apply_rotation(mesh.vertex_normals[i], mesh_transform.rotation)
   bsdf = BSDF{Float32}((1.0, 0.0, 0.0), 0, 0.5, 0.02)
   scattered = scatter_light_sources(bsdf, position, normal, lights, camera)
-  @test scattered === zero(Point3f)
+  @test all(scattered .≥ 0)
 
   scattered = compute_lighting(bsdf, position, normal, lights, camera)
-  @test scattered === zero(Point3f)
+  @test all(scattered .≥ 0)
 
   # Notes for comparisons with Blender scenes:
   # - GLTF XYZ <=> Blender XZ(-Y)

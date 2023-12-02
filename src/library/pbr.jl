@@ -77,12 +77,12 @@ const METAL_COLORS = Dict{Symbol,Vec3}(
 )
 
 function scattering(bsdf::BSDF{T}, position, light::Light, normal, view) where {T}
-  light_direction = normalize(position - light.position)
+  light_direction = normalize(light.position - position)
   diffuse_color = (1 .- bsdf.metallic) .* bsdf.base_color
   roughness = max(bsdf.roughness, T(0.089))^2
   f₀ = T(0.16) * bsdf.reflectance^2 * (one(T) - bsdf.metallic) .+ bsdf.base_color .* bsdf.metallic
   f₉₀ = one(T)
-  h = normalize(view - light_direction) / T(2)
+  h = normalize(view + light_direction)
   cosθ = view ⋅ h
   cosθ < zero(T) && return zero(Point{3,T})
   specular = brdf_specular(roughness, normal, h, view, light_direction, cosθ, f₀, f₉₀)
@@ -95,14 +95,14 @@ end
 
 function scatter_light_source(bsdf::BSDF, position, normal, light::Light, view)
   factor = scattering(bsdf, position, light, normal, view)
-  light_direction = normalize(position - light.position)
+  light_direction = normalize(light.position - position)
   sₗ = shape_factor(normal, light_direction)
   factor .* radiance(light, position) .* sₗ
 end
 
 function scatter_light_sources(bsdf::BSDF{T}, position, normal, lights, camera::Camera) where {T}
   res = zero(Point{3,T})
-  view = normalize(position - camera.transform.translation.vec)
+  view = normalize(camera.transform.translation.vec - position)
   for light in lights
     res += scatter_light_source(bsdf, position, normal, light, view)
   end
@@ -123,7 +123,8 @@ end
 function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{InvocationData}) where {T}
   (; camera) = data
   pbr = @load data.user_data::PBR{T}
-  scattered = scatter_light_sources(pbr.bsdf, SVector(position), SVector(normal), pbr.lights, camera)
+  # scattered = scatter_light_sources(pbr.bsdf, position, normal, pbr.lights, camera)
+  scattered = compute_lighting(pbr.bsdf, position, normal, pbr.lights, camera)
   color.rgb = clamp.(Vec3(scattered), 0F, 1F)
   color.a = 1F
 end
@@ -135,8 +136,8 @@ function Program(::Type{PBR{T}}, device) where {T}
   frag = @fragment device pbr_frag(
     ::Type{T},
     ::Vec4::Output,
-    ::Vec3::Input,
-    ::Vec3::Input,
+    ::Point3f::Input,
+    ::SVector{3,Float32}::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
   )
   Program(vert, frag)
@@ -205,7 +206,7 @@ shape_factor(x::AbstractVector{T}, y::AbstractVector{T}) where {T} = max(x ⋅ y
 
 function compute_lighting(bsdf::BSDF{T}, position, normal, light::Light, view) where {T}
   sᵥ = shape_factor(normal, view)
-  light_direction = normalize(position - light.position)
+  light_direction = normalize(light.position - position)
   sₗ = shape_factor(normal, light_direction)
   halfway_direction = normalize(light_direction + view)
   sₕ = shape_factor(normal, halfway_direction)
@@ -224,7 +225,7 @@ end
 
 function compute_lighting(bsdf::BSDF{T}, position, normal, lights, camera::Camera) where {T}
   res = zero(Point{3,T})
-  view = normalize(position - camera.transform.translation.vec)
+  view = normalize(camera.transform.translation.vec - position)
   for light in lights
     res += compute_lighting(bsdf, position, normal, light, view)
   end
