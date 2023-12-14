@@ -51,7 +51,7 @@ ProgramInvocationData(shader::GraphicsShaderComponent, parameters, prog, primiti
 ProgramInvocationData(shader::GraphicsShaderComponent, parameters, prog, primitives::AbstractVector{<:Primitive}) = ProgramInvocationData(shader, parameters, prog, Instance(primitives))
 
 function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::ShaderParameters, prog, instances::AbstractVector{<:Instance{IT,PT,VD}}) where {IT,PT,VD}
-  Tuple{VD,PT,IT} <: interface(shader) || throw(ArgumentError("The provided instances do not respect the interface declared by $shader: ($VT,$PT,$IT) ≠ $((interface(shader).parameters...,))"))
+  Tuple{VD,PT,IT} <: interface(shader) || throw(ArgumentError("The provided instances do not respect the interface declared by $(nameof(typeof(shader))): ($VD,$PT,$IT) ≠ $((interface(shader).parameters...,))"))
   vertex_data, primitive_data, instance_data = data_container.((VD, PT, IT))
   vertex_locations = Vec3[]
   vertex_normals = Vec3[]
