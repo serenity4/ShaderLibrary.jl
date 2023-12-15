@@ -28,14 +28,14 @@
   @testset "GLTF imports" begin
     gltf = read_gltf("blob.gltf");
 
-    camera = read_camera(gltf)
+    camera = import_camera(gltf)
     @test isa(camera, Camera)
     @test camera.transform.translation === Translation(4.1198707F, 3.02657F, 4.3737516F)
 
-    lights = read_lights(gltf)
+    lights = import_lights(gltf)
     @test length(lights) == 1
     light = lights[1]
     @test isa(light, Light)
-    @test light.position == Point3f(4.0256276, 4.5642242, -0.28052378)
+    @test light.position == Point3f(4.0256276, 0.28052378, 4.5642242)
   end
 end;
