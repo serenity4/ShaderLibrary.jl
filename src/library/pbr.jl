@@ -213,7 +213,7 @@ function compute_lighting(bsdf::BSDF{T}, position, normal, light::Light, view) w
   # f₀ = T(0.16) * bsdf.reflectance^2 * (one(T) - bsdf.metallic) .+ bsdf.base_color .* bsdf.metallic
   f₀ = lerp(@SVector(ones(T, 3)), bsdf.base_color, bsdf.metallic)
   α = bsdf.roughness
-  specular = cook_torrance_specular_brdf(bsdf.roughness, sᵥ, sₗ, sₕ)
+  specular = cook_torrance_specular_brdf(α, sᵥ, sₗ, sₕ)
   kₛ = surface_reflection(max(halfway_direction ⋅ view, zero(T)), f₀)
   diffuse = kₛ .* brdf_diffuse_lambertian(bsdf.base_color)
   kd = (@SVector(ones(T, 3)) .- kₛ) .* (one(T) - bsdf.metallic)

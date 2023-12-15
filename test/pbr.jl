@@ -5,7 +5,7 @@ using ShaderLibrary: scatter_light_sources, compute_lighting
   lights = import_lights(gltf)
   camera = import_camera(gltf)
   mesh = import_mesh(gltf)
-  mesh_transform = import_transform(gltf.nodes[end])
+  mesh_transform = import_transform(gltf.nodes[end]; apply_rotation = false)
   i = last(findmin(v -> distance2(lights[1].position, apply_transform(v, mesh_transform)), mesh.vertex_locations))
   position = apply_transform(mesh.vertex_locations[i], mesh_transform)
   normal = apply_rotation(mesh.vertex_normals[i], mesh_transform.rotation)

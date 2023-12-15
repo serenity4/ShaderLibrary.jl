@@ -1,19 +1,16 @@
-function import_mesh(gltf::GLTF.Object, node::GLTF.Node)
-  mesh = VertexMesh(gltf, node)
-  y_up_to_z_up!(mesh)
-end
+import_mesh(gltf::GLTF.Object, node::GLTF.Node) = y_up_to_z_up!(VertexMesh(gltf, node))
+import_mesh(gltf::GLTF.Object) = y_up_to_z_up!(VertexMesh(gltf))
 
-function import_mesh(gltf::GLTF.Object)
-  scene = gltf.scenes[gltf.scene]
-  mesh_indices = findall(x -> !isnothing(x.mesh), collect(gltf.nodes))
-  isempty(mesh_indices) && error("No mesh found.")
-  length(mesh_indices) > 1 && error("More than one mesh found.")
-  i = only(mesh_indices)
-  node = gltf.nodes[scene.nodes[i]]
-  import_mesh(gltf, node)
-end
+"""
+Read a `Transform` from the given GLTF node.
 
-import_transform(node::GLTF.Node) = y_up_to_z_up(Transform(node))
+`apply_rotation` specifies whether the +Y up to +Z up convention transform should be applied
+to the transform as a rotation, or if components must simply be remapped.
+
+If a mesh is to be read, or any other object that contains spatial data such that conventions may be applied on that data,
+then `apply_rotation` must be set to `false`. Other objects, such as cameras and point lights, require `apply_rotation` to be true.
+"""
+import_transform(node::GLTF.Node; apply_rotation = true) = y_up_to_z_up(Transform(node); apply_rotation)
 
 "Convert from a convention of +Y up to +Z up, assuming both are right-handed."
 function y_up_to_z_up end
@@ -22,6 +19,7 @@ y_up_to_z_up(p::Point{3}) = Point(p[1], -p[3], p[2])
 
 function y_up_to_z_up!(mesh::VertexMesh)
   mesh.vertex_locations .= y_up_to_z_up.(mesh.vertex_locations)
+  mesh.vertex_normals .= y_up_to_z_up.(mesh.vertex_normals)
   mesh
 end
 
@@ -30,15 +28,23 @@ function y_up_to_z_up(sc::Scaling)
   (sx, sy, sz) = sc.vec
   Scaling(sx, sz, sy)
 end
-function y_up_to_z_up(q::Quaternion)
+function apply_y_up_to_z_up_rotation(q::Quaternion)
+  # Define rotation along X axis.
+  qᵣₓ = Quaternion(RotationPlane(1F, 0F, 0F), (π)F/2)
+  # Apply the rotation using matrices.
+  q′ = Quaternion(SMatrix{3,3}(qᵣₓ) * SMatrix{3,3}(q))
+  # Negate w component. Not sure why it's needed, but it's needed.
+  Quaternion(-q′.w, q′.x, q′.y, q′.z)
+end
+function remap_y_up_to_z_up(q::Quaternion)
   cosθ, Δsinθ = q.w, (q.x, q.y, q.z)
   Quaternion(cosθ, y_up_to_z_up(Point(Δsinθ))...)
 end
 
-y_up_to_z_up(tr::Transform) = Transform(y_up_to_z_up(tr.translation), y_up_to_z_up(tr.rotation), y_up_to_z_up(tr.scaling))
+y_up_to_z_up(tr::Transform; apply_rotation = true) = Transform(y_up_to_z_up(tr.translation), apply_rotation ? apply_y_up_to_z_up_rotation(tr.rotation) : remap_y_up_to_z_up(tr.rotation), y_up_to_z_up(tr.scaling))
 
-function Camera(gltf::GLTF.Object, node::GLTF.Node)
-  transform = Transform(node)
+function import_camera(gltf::GLTF.Object, node::GLTF.Node)
+  transform = import_transform(node)
   camera = gltf.cameras[node.camera]
   (; orthographic, perspective) = camera
   if !isnothing(perspective)
@@ -52,7 +58,7 @@ function import_camera(gltf::GLTF.Object)
   cameras = findall(x -> !isnothing(x.camera), collect(gltf.nodes))
   isempty(cameras) && error("No camera found in GLTF scene")
   length(cameras) > 1 && error("Multiple cameras found in GLTF scene")
-  Camera(gltf, gltf.nodes[only(cameras) - 1])
+  import_camera(gltf, gltf.nodes[only(cameras) - 1])
 end
 
 function Light{Float32}(gltf::GLTF.Object, node::GLTF.Node)

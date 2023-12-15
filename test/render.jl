@@ -145,5 +145,20 @@
     render(device, pbr, cube_parameters, primitive)
     data = collect(color, device)
     save_test_render("shaded_cube_pbr.png", data)
+
+    # empty!(device.shader_cache)
+    gltf = read_gltf("blob.gltf")
+    bsdf = BSDF{Float32}((1.0, 0.0, 0.0), 0, 0.5, 0.02)
+    lights = import_lights(gltf)
+    lights_buffer = Buffer(device; data = lights)
+    pbr = PBR(bsdf, PhysicalBuffer{Light{Float32}}(length(lights), lights_buffer))
+    camera = import_camera(gltf)
+    mesh = import_mesh(gltf)
+    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = import_transform(gltf.nodes[end]; apply_rotation = false))
+    cube_parameters = setproperties(parameters, (; camera))
+
+    render(device, pbr, cube_parameters, primitive)
+    data = collect(color, device)
+    save_test_render("shaded_blob_pbr.png", data, 0x4a75e927390bdc2a)
   end
 end;
