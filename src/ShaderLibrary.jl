@@ -2,7 +2,7 @@ module ShaderLibrary
 
 using Random: Random, MersenneTwister, AbstractRNG
 using StaticArrays
-using Accessors: @set, setproperties
+using Accessors: @set, @reset, setproperties
 using ColorTypes
 using SPIRV: SPIRV, validate, U, F, image_type
 using SPIRV.MathFunctions
@@ -76,6 +76,12 @@ export
   LargeScaleErosion,
 
   Camera, project,
-  remap
+  remap,
+
+  # Imports
+  import_mesh,
+  import_camera,
+  import_lights,
+  import_transform
 
 end

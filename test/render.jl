@@ -118,7 +118,7 @@
                   (0.91, 0.53, 0.98),
                   (0.16, 0.01, 0.53),
                   (0.49, 0.05, 0.38)]
-    mesh = read_mesh("cube.gltf")
+    mesh = import_mesh(read_gltf("cube.gltf"))
     mesh = VertexMesh(mesh.encoding, mesh.vertex_locations; mesh.vertex_normals, vertex_data = colors)
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(RotationPlane(1.0, 0.0, 1.0), 0.3π)))
     grad = Gradient()
@@ -126,7 +126,7 @@
     cube_parameters = setproperties(parameters, (; camera))
     render(device, grad, cube_parameters, primitive)
     data = collect(color, device)
-    save_test_render("colored_cube.png", data, 0x0574cf0b4f40eeec)
+    save_test_render("colored_cube.png", data, 0x6c3e00f2bce3a00a)
   end
 
   @testset "PBR" begin
@@ -137,7 +137,7 @@
     prog = Program(typeof(pbr), device)
     @test isa(prog, Program)
 
-    mesh = read_mesh("cube.gltf")
+    mesh = import_mesh(read_gltf("cube.gltf"))
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(RotationPlane(1.0, 0.0, 1.0), 0.3π)))
     camera = Camera(focal_length = 2, near_clipping_plane = -2)
     cube_parameters = setproperties(parameters, (; camera))

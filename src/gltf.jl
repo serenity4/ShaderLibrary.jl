@@ -1,3 +1,42 @@
+function import_mesh(gltf::GLTF.Object, node::GLTF.Node)
+  mesh = VertexMesh(gltf, node)
+  y_up_to_z_up!(mesh)
+end
+
+function import_mesh(gltf::GLTF.Object)
+  scene = gltf.scenes[gltf.scene]
+  mesh_indices = findall(x -> !isnothing(x.mesh), collect(gltf.nodes))
+  isempty(mesh_indices) && error("No mesh found.")
+  length(mesh_indices) > 1 && error("More than one mesh found.")
+  i = only(mesh_indices)
+  node = gltf.nodes[scene.nodes[i]]
+  import_mesh(gltf, node)
+end
+
+import_transform(node::GLTF.Node) = y_up_to_z_up(Transform(node))
+
+"Convert from a convention of +Y up to +Z up, assuming both are right-handed."
+function y_up_to_z_up end
+
+y_up_to_z_up(p::Point{3}) = Point(p[1], -p[3], p[2])
+
+function y_up_to_z_up!(mesh::VertexMesh)
+  mesh.vertex_locations .= y_up_to_z_up.(mesh.vertex_locations)
+  mesh
+end
+
+y_up_to_z_up(tr::Translation) = Translation(y_up_to_z_up(tr.vec))
+function y_up_to_z_up(sc::Scaling)
+  (sx, sy, sz) = sc.vec
+  Scaling(sx, sz, sy)
+end
+function y_up_to_z_up(q::Quaternion)
+  cosθ, Δsinθ = q.w, (q.x, q.y, q.z)
+  Quaternion(cosθ, y_up_to_z_up(Point(Δsinθ))...)
+end
+
+y_up_to_z_up(tr::Transform) = Transform(y_up_to_z_up(tr.translation), y_up_to_z_up(tr.rotation), y_up_to_z_up(tr.scaling))
+
 function Camera(gltf::GLTF.Object, node::GLTF.Node)
   transform = Transform(node)
   camera = gltf.cameras[node.camera]
@@ -9,7 +48,7 @@ function Camera(gltf::GLTF.Object, node::GLTF.Node)
   end
 end
 
-function read_camera(gltf::GLTF.Object)
+function import_camera(gltf::GLTF.Object)
   cameras = findall(x -> !isnothing(x.camera), collect(gltf.nodes))
   isempty(cameras) && error("No camera found in GLTF scene")
   length(cameras) > 1 && error("Multiple cameras found in GLTF scene")
@@ -17,7 +56,7 @@ function read_camera(gltf::GLTF.Object)
 end
 
 function Light{Float32}(gltf::GLTF.Object, node::GLTF.Node)
-  tr = Transform(node)
+  tr = import_transform(node)
   position = apply_transform(zero(Point3f), tr)
   i = node.extensions["KHR_lights_punctual"]["light"]
   light = gltf.extensions["KHR_lights_punctual"]["lights"][i + 1]
@@ -34,7 +73,7 @@ function light_type(type::AbstractString)
   error("Unknown light type `$type`")
 end
 
-function read_lights(gltf::GLTF.Object)
+function import_lights(gltf::GLTF.Object)
   lights = Light{Float32}[]
   !haskey(gltf.extensions, "KHR_lights_punctual")
   for node in gltf.nodes

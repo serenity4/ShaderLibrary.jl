@@ -1,5 +1,5 @@
 using ShaderLibrary
-using ShaderLibrary: glyph_quads, Text, read_lights, read_camera
+using ShaderLibrary: glyph_quads, Text
 using Test
 using GeometryExperiments: Point2, Point3f
 using Lava
