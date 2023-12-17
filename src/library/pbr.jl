@@ -48,7 +48,7 @@ function brdf_diffuse_disney(α, n, v, l, h, f₀)
   light_scatter .* view_scatter ./ (π)F
 end
 
-brdf_diffuse_lambertian(albedo) = albedo / (π)F
+lambertian_diffuse_brdf(albedo) = albedo / (π)F
 
 # Parametrization as described in Section 4.8 of https://google.github.io/filament/Filament.html
 struct BSDF{T<:Real}
@@ -86,7 +86,7 @@ function scattering(bsdf::BSDF{T}, position, light::Light, normal, view) where {
   cosθ = view ⋅ h
   cosθ < zero(T) && return zero(Point{3,T})
   specular = brdf_specular(roughness, normal, h, view, light_direction, cosθ, f₀, f₉₀)
-  diffuse = brdf_diffuse_lambertian(bsdf.base_color)
+  diffuse = lambertian_diffuse_brdf(bsdf.base_color)
   # diffuse = brdf_diffuse_disney(roughness, normal, view, light_direction, h, f₀)
   brdf = specular .* diffuse
   btdf = one(T) # XXX
@@ -109,6 +109,10 @@ function scatter_light_sources(bsdf::BSDF{T}, position, normal, lights, camera::
   res
 end
 
+# For a more elaborate tone mapping, see http://www.oscars.org/science-technology/sci-tech-projects/aces.
+hdr_tone_mapping(intensity) = intensity ./ (1F .+ intensity)
+gamma_corrected(color, γ) = color .^ (inv(γ))
+
 struct PBR{T} <: Material
   bsdf::BSDF{T}
   lights::PhysicalBuffer{Light{T}}
@@ -124,8 +128,10 @@ function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{Invo
   (; camera) = data
   pbr = @load data.user_data::PBR{T}
   # scattered = scatter_light_sources(pbr.bsdf, position, normal, pbr.lights, camera)
-  scattered = compute_lighting(pbr.bsdf, position, normal, pbr.lights, camera)
-  color.rgb = clamp.(Vec3(scattered), 0F, 1F)
+  color.rgb = compute_lighting(pbr.bsdf, position, normal, pbr.lights, camera)
+  # XXX: Perform tone-mapping and gamma correction outside of the fragment shader.
+  color.rgb = hdr_tone_mapping(color.rgb)
+  color.rgb = gamma_corrected(color.rgb, 2.2F)
   color.a = 1F
 end
 user_data(pbr::PBR, ctx) = pbr
@@ -185,7 +191,7 @@ Describes the ratio of surface reflection at different surface angles.
 Uses the Fresnel equation, which interpolates between an incident factor f₀ and a tangent factor f₉₀ (often taken to be zero - no light reflected for a tangential ray).
 """
 surface_reflection(s, f₀) = surface_reflection_fresnel(s, f₀)
-surface_reflection_fresnel(s, f₀) = lerp(one(s), pow5(clamp(one(s) - s, zero(s), one(s))), f₀)
+surface_reflection_fresnel(s, f₀) = lerp(one(s), pow5(one(s) - s), f₀)
 
 """
 - `α`: roughness factor.
@@ -210,13 +216,13 @@ function compute_lighting(bsdf::BSDF{T}, position, normal, light::Light, view) w
   sₗ = shape_factor(normal, light_direction)
   halfway_direction = normalize(light_direction + view)
   sₕ = shape_factor(normal, halfway_direction)
-  # f₀ = T(0.16) * bsdf.reflectance^2 * (one(T) - bsdf.metallic) .+ bsdf.base_color .* bsdf.metallic
-  f₀ = lerp(@SVector(ones(T, 3)), bsdf.base_color, bsdf.metallic)
+  f₀ = lerp(bsdf.base_color, @SVector(ones(T, 3)) .* 0.04F, bsdf.metallic)
   α = bsdf.roughness
-  specular = cook_torrance_specular_brdf(α, sᵥ, sₗ, sₕ)
   kₛ = surface_reflection(max(halfway_direction ⋅ view, zero(T)), f₀)
-  diffuse = kₛ .* brdf_diffuse_lambertian(bsdf.base_color)
-  kd = (@SVector(ones(T, 3)) .- kₛ) .* (one(T) - bsdf.metallic)
+  kd = @SVector(ones(T, 3)) .- kₛ
+  kd *= one(T) - bsdf.metallic
+  specular = cook_torrance_specular_brdf(α, sᵥ, sₗ, sₕ)
+  diffuse = lambertian_diffuse_brdf(bsdf.base_color)
   brdf = kₛ .* specular .+ kd .* diffuse
   btdf = one(T)
   scattering = brdf .* btdf
