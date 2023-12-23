@@ -67,7 +67,7 @@ function Program(::Type{S}, device) where {T,M,S<:LargeScaleErosion{T,M}}
   I = SPIRV.image_type(eltype_to_image_format(T), SPIRV.Dim2D, 0, false, false, 1)
   compute = @compute device large_scale_erosion_comp!(
     ::DeviceAddressBlock::PushConstant,
-    ::Arr{2048,I}::UniformConstant{@DescriptorSet(0), @Binding(3)},
+    ::Arr{2048,I}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)},
     ::Vec{3,UInt32}::Input{LocalInvocationId},
     ::Vec{3,UInt32}::Input{WorkgroupId},
     ::Type{M},

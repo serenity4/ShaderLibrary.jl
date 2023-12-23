@@ -41,7 +41,7 @@ reference_attachment(parameters::ShaderParameters) = parameters.color[1]
 
 function resource_dependencies(shader::GraphicsShaderComponent, parameters::ShaderParameters)
   (; color, color_clear, depth, depth_clear, stencil, stencil_clear) = parameters
-  dependencies = resource_dependencies(shader)
+  dependencies = @something(resource_dependencies(shader), Dictionary{Resource,ResourceDependency}())
   for (attachment, clear) in zip(color, color_clear)
     insert!(dependencies, attachment, ResourceDependency(RESOURCE_USAGE_COLOR_ATTACHMENT, WRITE, clear, nothing))
   end
@@ -92,7 +92,7 @@ function Command(cache::ProgramCache, shader::ComputeShaderComponent, parameters
   compute_command(
     Dispatch(invocations...),
     prog,
-    ProgramInvocationData(shader, prog),
+    ProgramInvocationData(shader, prog, invocations),
     resource_dependencies(shader),
   )
 end
@@ -105,4 +105,4 @@ end
 image_index(linear_index, (ni, nj)) = (linear_index % ni, linear_index ÷ ni)
 
 render(device, shader::GraphicsShaderComponent, parameters::ShaderParameters, args...) = render(device, renderables(shader, parameters, device, args...))
-compute(device, shader::ComputeShaderComponent, parameters::ShaderParameters, args...) = compute(device, renderables(shader, parameters, device, args...))
+compute(device, shader::ComputeShaderComponent, parameters::ShaderParameters, args...) = render(device, renderables(shader, parameters, device, args...))

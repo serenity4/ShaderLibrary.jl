@@ -12,6 +12,15 @@ using ShaderLibrary: linearize_index, image_index
     @test image_index(184, (20, 10)) == (4, 9)
   end;
 
+  @testset "Gamma correction" begin
+    nx, ny = (512, 512)
+    texture = read_texture("boid.png")
+    image = image_resource(device, texture; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT)
+    shader = GammaCorrection(image)
+    # XXX: Shader compilation breaks on NVIDIA driver, despite spirv-val succeeding.
+    @test_skip compute(device, shader, ShaderParameters(), (64, 64, 1))
+  end
+
   @testset "Large-scale terrain erosion" begin
     nx, ny = (256, 256)
     drainage_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT)

@@ -48,7 +48,7 @@ function Program(::Type{GaussianBlurDirectional}, device)
     ::Vec4::Output,
     ::Vec2::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
-    ::Arr{2048,SPIRV.SampledImage{image_type(SPIRV.ImageFormatRgba16f, SPIRV.Dim2D, 0, false, false, 1)}}::UniformConstant{@DescriptorSet(0), @Binding(3)})
+    ::Arr{2048,SPIRV.SampledImage{image_type(SPIRV.ImageFormatRgba16f, SPIRV.Dim2D, 0, false, false, 1)}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
   Program(vert, frag)
 end
 

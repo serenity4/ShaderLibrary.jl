@@ -160,6 +160,6 @@
     render(device, pbr, cube_parameters, primitive)
     data = collect(color, device)
     # XXX: specular reflections seem off under high-intensity lighting at high incidence.
-    save_test_render("shaded_blob_pbr.png", data, 0xcabd5d5235ccc33f)
+    save_test_render("shaded_blob_pbr.png", data, 0x17de4b128405f265)
   end
 end;

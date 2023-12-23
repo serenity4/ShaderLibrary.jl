@@ -37,6 +37,7 @@ include("library/quadratic_bezier_fill.jl")
 include("library/text.jl")
 include("library/pbr.jl")
 include("library/erosion.jl")
+include("library/gamma_correction.jl")
 
 include("gltf.jl")
 
@@ -73,6 +74,9 @@ export
 
   # Graphics shader components
   GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL, GaussianBlur,
+
+  # Compute shader components
+  GammaCorrection,
   LargeScaleErosion,
 
   Camera, project,
