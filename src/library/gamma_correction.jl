@@ -11,7 +11,7 @@ struct GammaCorrectionData
   dispatch_size::NTuple{3,UInt32}
 end
 
-function gamma_correction_comp((; data)::PhysicalRef{GammaCorrectionData}, images, local_id::Vec{3,UInt32}, global_id::Vec{3,UInt32})
+function gamma_correction_comp((; data)::PhysicalRef{GammaCorrectionData}, images, local_id::SVector{3,UInt32}, global_id::SVector{3,UInt32})
   color = images[data.image]
   li = linearize_index(global_id, data.dispatch_size, local_id, workgroup_size(GammaCorrection))
   (i, j) = image_index(li, data.size)
@@ -23,13 +23,13 @@ function Program(::Type{GammaCorrection}, device)
   comp = @compute device gamma_correction_comp(
     ::PhysicalRef{GammaCorrectionData}::PushConstant,
     ::Arr{512,I}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_STORAGE_IMAGE)},
-    ::Vec{3,UInt32}::Input{LocalInvocationId},
-    ::Vec{3,UInt32}::Input{WorkgroupId},
+    ::SVector{3,UInt32}::Input{LocalInvocationId},
+    ::SVector{3,UInt32}::Input{WorkgroupId},
   ) options = ComputeExecutionOptions(local_size = workgroup_size(GammaCorrection))
   Program(comp)
 end
 
-workgroup_size(::Type{GammaCorrection}) = (8, 8, 1)
+workgroup_size(::Type{GammaCorrection}) = (8U, 8U, 1U)
 # dispatch_size(shader::GammaCorrection) = # TODO
 
 resource_dependencies(gamma::GammaCorrection) = @resource_dependencies begin

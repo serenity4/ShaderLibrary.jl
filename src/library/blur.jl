@@ -69,6 +69,8 @@ function renderables(cache::ProgramCache, blur::GaussianBlur, parameters::Shader
   transient_color = similar(color; blur.texture.image.image.dims, usage_flags = Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT, name = :transient_color)
 
   # First, blur the whole texture once, then blur only the relevant portion.
+  # XXX: We could deduce a conservative bounding box from the radius
+  # and blur this region only, instead of the whole texture.
   blur_x = GaussianBlurDirectional(blur.texture, BLUR_HORIZONTAL, blur.size)
   uvs = Vec2.([0.5 * (1 .+ p) for p in PointSet(HyperCube{2}, Point2f)])
   rect = Rectangle((-1, -1), (1, 1), uvs, nothing)

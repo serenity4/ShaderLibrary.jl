@@ -99,7 +99,7 @@ end
 
 linearize_index((x, y, z), (nx, ny, nz)) = x + y * nx + z * nx * ny
 function linearize_index(global_id, global_size, local_id, local_size)
-  linearize_index(local_id, local_size) + prod(local_size) * linearize_index(global_id, global_size)
+  linearize_index(local_id, local_size) + foldl(*, local_size) * linearize_index(global_id, global_size)
 end
 
 image_index(linear_index, (ni, nj)) = (linear_index % ni, linear_index ÷ ni)

@@ -1,4 +1,5 @@
 using ShaderLibrary: linearize_index, image_index
+using ShaderLibrary: GaussianBlurDirectionalComp, GaussianBlurComp
 
 @testset "Computing with compute shaders" begin
   @testset "Index computation" begin
@@ -6,19 +7,38 @@ using ShaderLibrary: linearize_index, image_index
     @test linearize_index((1, 0, 0), (8, 1, 1), (0, 0, 0), (8, 8, 1)) == 64
     @test linearize_index((1, 0, 0), (8, 1, 1), (1, 0, 0), (8, 8, 1)) == 65
     @test linearize_index((7, 0, 0), (8, 1, 1), (7, 7, 0), (8, 8, 1)) == 511
-  
+
     @test image_index(0, (20, 10)) == (0, 0)
     @test image_index(13, (20, 10)) == (13, 0)
     @test image_index(184, (20, 10)) == (4, 9)
   end;
 
   @testset "Gamma correction" begin
-    nx, ny = (512, 512)
     texture = read_texture("boid.png")
-    image = image_resource(device, texture; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT)
+    image = image_resource(device, texture; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
     shader = GammaCorrection(image)
-    # XXX: Shader compilation breaks on NVIDIA driver, despite spirv-val succeeding.
-    @test_skip compute(device, shader, ShaderParameters(), (64, 64, 1))
+    compute(device, shader, ShaderParameters(), (64, 64, 1))
+    data = collect(shader.color, device)
+    # XXX: Why is the data transposed?
+    save_test_render("gamma_correction.png", data', 0x8d49934fbbfc0415)
+  end
+
+  @testset "Gaussian blur" begin
+    texture = read_texture("normal.png")
+    source = image_resource(device, texture; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT)
+    destination = similar(source; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
+    shader = GaussianBlurDirectionalComp{RGBA{Float16}}(source, destination, BLUR_VERTICAL, 8)
+    compute(device, shader, ShaderParameters(), (64, 64, 1))
+    data = collect(shader.destination, device)
+    # XXX: Why is the data transposed?
+    save_test_render("gaussian_blur_vertical.png", data', 0xc8166f239f343c36)
+
+    destination = similar(source; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
+    shader = GaussianBlurComp{RGBA{Float16}}(source, destination, 8)
+    compute(device, shader, ShaderParameters(), (64, 64, 1))
+    data = collect(shader.destination, device)
+    # XXX: Why is the data transposed?
+    save_test_render("gaussian_blur.png", data', 0x23342cacc5cd5f17)
   end
 
   @testset "Large-scale terrain erosion" begin

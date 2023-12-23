@@ -10,7 +10,7 @@ struct LargeScaleErosionData{M<:TectonicBasedErosion}
   dispatch_size::NTuple{3,UInt32}
 end
 
-function large_scale_erosion_comp!(data_address::DeviceAddressBlock, images, local_id::Vec{3,UInt32}, global_id::Vec{3,UInt32}, ::Type{M}) where {M}
+function large_scale_erosion_comp!(data_address::DeviceAddressBlock, images, local_id::SVector{3,UInt32}, global_id::SVector{3,UInt32}, ::Type{M}) where {M}
   data = @load data_address::LargeScaleErosionData{M}
   (; dispatch_size) = data
   li = linearize_index(global_id, dispatch_size, local_id, workgroup_size(LargeScaleErosion))
@@ -68,8 +68,8 @@ function Program(::Type{S}, device) where {T,M,S<:LargeScaleErosion{T,M}}
   compute = @compute device large_scale_erosion_comp!(
     ::DeviceAddressBlock::PushConstant,
     ::Arr{2048,I}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)},
-    ::Vec{3,UInt32}::Input{LocalInvocationId},
-    ::Vec{3,UInt32}::Input{WorkgroupId},
+    ::SVector{3,UInt32}::Input{LocalInvocationId},
+    ::SVector{3,UInt32}::Input{WorkgroupId},
     ::Type{M},
   ) options = ComputeExecutionOptions(local_size = workgroup_size(S))
   Program(compute)
