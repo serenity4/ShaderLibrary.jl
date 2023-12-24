@@ -2,14 +2,15 @@ render_file(filename; tmp = false) = joinpath(@__DIR__, "renders", tmp ? "tmp" :
 texture_file(filename) = joinpath(@__DIR__, "textures", filename)
 font_file(filename) = joinpath(@__DIR__, "fonts", filename)
 gltf_file(filename) = joinpath(@__DIR__, "assets", filename)
-read_texture(filename) = convert(Matrix{RGBA{Float16}}, load(texture_file(filename)))
+read_texture(filename) = permutedims(convert(Matrix{RGBA{Float16}}, load(texture_file(filename))), (2, 1))
 read_gltf(filename) = GLTF.load(gltf_file(filename))
 
 function save_render(filename, data; tmp = false)
   filename = render_file(filename; tmp)
   mkpath(dirname(filename))
   ispath(filename) && rm(filename)
-  save(filename, data')
+  # PNG saving expects data in row-major format.
+  save(filename, PermutedDimsArray(data, (2, 1)))
   filename
 end
 

@@ -14,8 +14,10 @@ end
 function gamma_correction_comp((; data)::PhysicalRef{GammaCorrectionData}, images, local_id::SVector{3,UInt32}, global_id::SVector{3,UInt32})
   color = images[data.image]
   li = linearize_index(global_id, data.dispatch_size, local_id, workgroup_size(GammaCorrection))
+  li ≥ length(color) && return
   (i, j) = image_index(li, data.size)
   color[i, j] = Vec4(gamma_corrected(color[i, j].rgb, data.factor)..., color[i, j].a)
+  nothing
 end
 
 function Program(::Type{GammaCorrection}, device)

@@ -24,13 +24,13 @@
   @testset "Sprites" begin
     texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT)
     vertex_locations = Vec2[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]
-    vertex_data = Vec2[(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)]
+    vertex_data = Vec2[(0.0, 1.0), (1.0, 1.0), (0.5, 0.0)]
     mesh = VertexMesh(1:3, vertex_locations; vertex_data)
     sprite = Sprite(texture)
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
     render(device, sprite, parameters, primitive)
     data = collect(color, device)
-    save_test_render("sprite_triangle.png", data, 0x231cf3602440b50c)
+    save_test_render("sprite_triangle.png", data, 0xed065808b4f1105a)
   end
 
   @testset "Glyph rendering" begin
@@ -50,25 +50,25 @@
   @testset "Blur" begin
     texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT, name = :normal_map)
     vertex_locations = Vec2[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]
-    vertex_data = Vec2[(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)]
+    vertex_data = Vec2[(0.0, 1.0), (1.0, 1.0), (0.5, 0.0)]
     mesh = VertexMesh(1:3, vertex_locations; vertex_data)
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
 
     directional_blur = GaussianBlurDirectional(texture, BLUR_HORIZONTAL, 0.02)
     render(device, directional_blur, parameters, primitive)
     data = collect(color, device)
-    save_test_render("blurred_triangle_horizontal.png", data, 0x41c9e4d0f035ba4d)
+    save_test_render("blurred_triangle_horizontal.png", data, 0x7005c020ed6c6eee)
 
     directional_blur = GaussianBlurDirectional(texture, BLUR_VERTICAL, 0.02)
     render(device, directional_blur, parameters, primitive)
     data = collect(color, device)
-    save_test_render("blurred_triangle_vertical.png", data, 0xdbbcc39255604205)
+    save_test_render("blurred_triangle_vertical.png", data, 0x62d575bcc0946a2b)
 
     # Need to specify dimensions of the whole texture for the first pass.
     blur = GaussianBlur(texture, 0.02)
     render(device, blur, parameters, primitive)
     data = collect(color, device)
-    save_test_render("blurred_triangle.png", data, 0x693a0f0a619a8d27)
+    save_test_render("blurred_triangle.png", data, 0xd3ca709f7c08fdd6)
   end
 
   @testset "Text rendering" begin

@@ -1,6 +1,3 @@
-using ShaderLibrary: linearize_index, image_index
-using ShaderLibrary: GaussianBlurDirectionalComp, GaussianBlurComp
-
 @testset "Computing with compute shaders" begin
   @testset "Index computation" begin
     @test linearize_index((0, 0, 0), (8, 1, 1), (0, 0, 0), (8, 8, 1)) == 0
@@ -16,29 +13,27 @@ using ShaderLibrary: GaussianBlurDirectionalComp, GaussianBlurComp
   @testset "Gamma correction" begin
     texture = read_texture("boid.png")
     image = image_resource(device, texture; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
+    @test collect(image, device) == texture
     shader = GammaCorrection(image)
     compute(device, shader, ShaderParameters(), (64, 64, 1))
     data = collect(shader.color, device)
-    # XXX: Why is the data transposed?
-    save_test_render("gamma_correction.png", data', 0x8d49934fbbfc0415)
+    save_test_render("gamma_correction.png", data, 0x8d49934fbbfc0415)
   end
 
   @testset "Gaussian blur" begin
     texture = read_texture("normal.png")
     source = image_resource(device, texture; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT)
     destination = similar(source; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
-    shader = GaussianBlurDirectionalComp{RGBA{Float16}}(source, destination, BLUR_VERTICAL, 8)
+    shader = GaussianBlurDirectionalComp{RGBA{Float16}}(source, destination, BLUR_HORIZONTAL, 8)
     compute(device, shader, ShaderParameters(), (64, 64, 1))
     data = collect(shader.destination, device)
-    # XXX: Why is the data transposed?
-    save_test_render("gaussian_blur_vertical.png", data', 0xc8166f239f343c36)
+    save_test_render("gaussian_blur_vertical.png", data, 0xc8166f239f343c36)
 
     destination = similar(source; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
     shader = GaussianBlurComp{RGBA{Float16}}(source, destination, 8)
     compute(device, shader, ShaderParameters(), (64, 64, 1))
     data = collect(shader.destination, device)
-    # XXX: Why is the data transposed?
-    save_test_render("gaussian_blur.png", data', 0x23342cacc5cd5f17)
+    save_test_render("gaussian_blur.png", data, 0xa557571a7fa011dc)
   end
 
   @testset "Large-scale terrain erosion" begin

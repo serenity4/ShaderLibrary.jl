@@ -1,5 +1,5 @@
 using ShaderLibrary
-using ShaderLibrary: glyph_quads, Text
+using ShaderLibrary: glyph_quads, Text, linearize_index, image_index, GaussianBlurDirectionalComp, GaussianBlurComp
 using Test
 using GeometryExperiments: Point2, Point3f
 using Lava
