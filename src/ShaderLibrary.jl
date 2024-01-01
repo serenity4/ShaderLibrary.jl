@@ -9,8 +9,8 @@ using SPIRV.MathFunctions
 using Reexport
 @reexport using GeometryExperiments
 using Lava
+using Lava: Image
 using SPIRV
-using SPIRV: unsigned_index
 using OpenType
 using OpenType: curves, curves_normalized, Line
 using Erosion
@@ -28,6 +28,7 @@ include("primitive.jl")
 include("shader.jl")
 include("invocation.jl")
 include("lights.jl")
+include("environment.jl")
 
 include("library/gradient.jl")
 include("library/rectangle.jl")
@@ -72,6 +73,9 @@ export
 
   # Lights
   Light, LightType, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, LIGHT_TYPE_DIRECTION,
+
+  # Environment
+  CubeMap, Environment,
 
   # Graphics shader components
   GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL, GaussianBlur,

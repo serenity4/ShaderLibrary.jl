@@ -4,8 +4,8 @@ struct LargeScaleErosion{T<:AbstractFloat,M<:TectonicBasedErosion} <: ComputeSha
 end
 
 struct LargeScaleErosionData{M<:TectonicBasedErosion}
-  maps::ErosionMaps{DescriptorIndex}
   model::M
+  maps::ErosionMaps{DescriptorIndex}
   size::Tuple{UInt32, UInt32}
   dispatch_size::NTuple{3,UInt32}
 end
@@ -87,6 +87,6 @@ function ProgramInvocationData(shader::LargeScaleErosion, prog, invocations)
       @descriptor(maps.uplift),
       @descriptor(maps.new_uplift),
     )
-    @block LargeScaleErosionData(shader.model, maps, (nx, ny), invocations)
+    @block LargeScaleErosionData(maps, shader.model, (nx, ny), invocations)
   end
 end

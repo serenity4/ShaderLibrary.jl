@@ -1,9 +1,9 @@
 render_file(filename; tmp = false) = joinpath(@__DIR__, "renders", tmp ? "tmp" : "", filename)
 texture_file(filename) = joinpath(@__DIR__, "textures", filename)
 font_file(filename) = joinpath(@__DIR__, "fonts", filename)
-gltf_file(filename) = joinpath(@__DIR__, "assets", filename)
+asset(filename, filenames...) = joinpath(@__DIR__, "assets", filename, filenames...)
 read_texture(filename) = permutedims(convert(Matrix{RGBA{Float16}}, load(texture_file(filename))), (2, 1))
-read_gltf(filename) = GLTF.load(gltf_file(filename))
+read_gltf(filename) = GLTF.load(asset(filename))
 
 function save_render(filename, data; tmp = false)
   filename = render_file(filename; tmp)
