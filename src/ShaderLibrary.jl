@@ -9,8 +9,8 @@ using SPIRV.MathFunctions
 using Reexport
 @reexport using GeometryExperiments
 using Lava
-using Lava: Image
 using SPIRV
+using Lava: Image
 using OpenType
 using OpenType: curves, curves_normalized, Line
 using Erosion
@@ -70,6 +70,8 @@ export
 
   # Geometries
   Rectangle,
+  screen_semidiagonal,
+  screen_box,
 
   # Lights
   Light, LightType, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, LIGHT_TYPE_DIRECTION,

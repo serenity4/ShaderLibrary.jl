@@ -37,3 +37,17 @@ function project(p::Vec3, camera::Camera)
 
   Vec3(x, y, z)
 end
+
+function screen_semidiagonal(aspect_ratio::Number)
+  xmax = max(one(aspect_ratio), aspect_ratio)
+  ymax = max(one(aspect_ratio), one(aspect_ratio)/aspect_ratio)
+  (xmax, ymax)
+end
+screen_box(aspect_ratio::Number) = Box(Point(screen_semidiagonal(aspect_ratio)...))
+screen_box(color::Resource) = screen_box(aspect_ratio(color))
+
+function GeometryExperiments.Box(camera::Camera, color::Resource)
+  screen = screen_box(color)
+  # Zoom in/out to fit to the camera's focal length.
+  Box(screen.max .* camera.focal_length)
+end

@@ -2,8 +2,13 @@ render_file(filename; tmp = false) = joinpath(@__DIR__, "renders", tmp ? "tmp" :
 texture_file(filename) = joinpath(@__DIR__, "textures", filename)
 font_file(filename) = joinpath(@__DIR__, "fonts", filename)
 asset(filename, filenames...) = joinpath(@__DIR__, "assets", filename, filenames...)
-read_texture(filename) = permutedims(convert(Matrix{RGBA{Float16}}, load(texture_file(filename))), (2, 1))
+read_png(file) = permutedims(convert(Matrix{RGBA{Float16}}, load(file)), (2, 1))
+read_texture(filename) = read_png(texture_file(filename))
 read_gltf(filename) = GLTF.load(asset(filename))
+
+function color_attachment(device, dimensions)
+  color = attachment_resource(device, nothing; name = :color_target, format = RGBA{Float16}, samples = 4, usage_flags = Vk.IMAGE_USAGE_TRANSFER_SRC_BIT | Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT, dims = dimensions)
+end
 
 function save_render(filename, data; tmp = false)
   filename = render_file(filename; tmp)

@@ -56,7 +56,6 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
   vertex_locations = Vec3[]
   vertex_normals = Vec3[]
   primitive_indices = UInt32[]
-  ar = aspect_ratio(reference_attachment(parameters))
   for instance in instances
     for (i, primitive) in enumerate(instance.primitives)
       (; mesh) = primitive
@@ -81,6 +80,7 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
     idata = IT === Nothing ? DeviceAddress(0) : @address(@block instance_data)
     data = user_data(shader, __context__)
     udata = isnothing(data) ? DeviceAddress(0) : @address(@block data)
+    ar = aspect_ratio(reference_attachment(parameters))
     @block InvocationData(vlocs, vnorms, vdata, pdata, pinds, idata, udata, parameters.camera, ar)
   end
 end
@@ -91,11 +91,13 @@ function device_coordinates(xy, ar)
 end
 
 aspect_ratio(r::Resource) = aspect_ratio(dimensions(r.attachment))
-aspect_ratio(dims) = dims[1] / dims[2]
+aspect_ratio(dims) = Float32(dims[1] / dims[2])
 aspect_ratio(::Nothing) = error("Dimensions must be specified for the reference attachment.")
 
 point3(x::Point{2}) = Point{3,eltype(x)}(x..., 0)
 point3(x::Point{3}) = x
+point4(x::Point{3}) = Point{4,eltype(x)}(x..., 1)
+point4(x::Point{4}) = x
 
 vec3(x::Vec3) = x
 vec3(x::Tuple) = vec3(Point(x))
@@ -103,6 +105,9 @@ vec3(x) = convert(Vec3, x)
 vec3(x::Vec{2}) = Vec3(x..., 0)
 vec3(x::Point{2}) = Vec3(x..., 0)
 vec3(x::Point{3}) = Vec3(x...)
+vec4(x::Vec{3}) = Vec4(x..., 1)
+vec4(x::Point{3}) = Vec4(x..., 1)
+vec4(x) = convert(Vec4, x)
 
 world_to_screen_coordinates(position, data::InvocationData) = world_to_screen_coordinates(position, data.camera, data.aspect_ratio)
 function world_to_screen_coordinates(position, camera::Camera, aspect_ratio)

@@ -93,6 +93,50 @@
     save_test_render("text_lao.png", data, 0x3a656604417e8f07)
   end
 
+  @testset "Environment" begin
+    images = [read_png(asset("cubemap", face)) for face in ("px.png", "nx.png", "py.png", "ny.png", "pz.png", "nz.png")]
+    cubemap = CubeMap(images)
+    shader = Environment(device, cubemap)
+    @test isa(shader, Environment)
+
+    # We use a square color attachment for tests to avoid artefacts
+    # caused by a nonzero precision gradient due to otherwise rendering
+    # on a wide attachment from a square texture.
+    # See `environment_3_wide.png` which contains such artefacts.
+    color_square = color_attachment(device, [1024, 1024])
+    parameters_square = ShaderParameters(color_square)
+    screen = screen_box(color_square)
+
+    rotation = Rotation(RotationPlane((1, 0, 0), (0, 1, 0)), 0°)
+    directions = [apply_rotation(Point3f(xy..., -1), rotation) for xy in PointSet(screen)]
+    geometry = Primitive(Rectangle(screen, directions, nothing))
+    render(device, shader, parameters_square, geometry)
+    data = collect(color_square, device)
+    save_test_render("environment_1.png", data, 0xac54a6902a9f609a)
+
+    rotation = Rotation(RotationPlane((1, 0, 0), (0, 1, 0)), 10°)
+    directions = [apply_rotation(Point3f(xy..., -1), rotation) for xy in PointSet(screen)]
+    geometry = Primitive(Rectangle(screen, directions, nothing))
+    render(device, shader, parameters_square, geometry)
+    data = collect(color_square, device)
+    save_test_render("environment_2.png", data, 0x99950cb2f16d317c)
+
+    rotation = Rotation(RotationPlane((1, 0, 0), (0, 0, 1)), 45°)
+    directions = [apply_rotation(Point3f(xy..., -1), rotation) for xy in PointSet(screen)]
+    geometry = Primitive(Rectangle(screen, directions, nothing))
+    render(device, shader, parameters_square, geometry)
+    data = collect(color_square, device)
+    save_test_render("environment_3.png", data, 0x54be001651e90148)
+
+    screen = screen_box(color)
+    rotation = Rotation(RotationPlane((1, 0, 0), (0, 0, 1)), 45°)
+    directions = [apply_rotation(Point3f(xy..., -1), rotation) for xy in PointSet(screen)]
+    geometry = Primitive(Rectangle(screen, directions, nothing))
+    render(device, shader, parameters, geometry)
+    data = collect(color, device)
+    save_test_render("environment_3_wide.png", data, 0x6dc080b417c2e94f)
+  end
+
   @testset "Meshes" begin
     colors = Vec3[(0.43, 0.18, 0.68),
                   (0.76, 0.37, 0.76),
@@ -160,6 +204,6 @@
     render(device, pbr, cube_parameters, primitive)
     data = collect(color, device)
     # XXX: specular reflections seem off under high-intensity lighting at high incidence.
-    save_test_render("shaded_blob_pbr.png", data, 0x17de4b128405f265)
+    save_test_render("shaded_blob_pbr.png", data, 0xc3b162f3709518d0)
   end
 end;

@@ -38,6 +38,7 @@ a list of `RenderNode`s.
 abstract type GraphicsShaderComponent <: ShaderComponent end
 
 reference_attachment(parameters::ShaderParameters) = parameters.color[1]
+GeometryExperiments.Box(parameters::ShaderParameters) = Box(parameters.camera, reference_attachment(parameters))
 
 function resource_dependencies(shader::GraphicsShaderComponent, parameters::ShaderParameters)
   (; color, color_clear, depth, depth_clear, stencil, stencil_clear) = parameters
@@ -70,6 +71,7 @@ Command(shader::ShaderComponent, parameters::ShaderParameters, device, args...) 
 
 const DEFAULT_CLEAR_VALUE = ClearValue((0.08, 0.05, 0.1, 1.0))
 
+interface(::ShaderComponent) = Tuple{Nothing,Nothing,Nothing}
 resource_dependencies(shader::GraphicsShaderComponent) = Lava.Dictionary{Resource,ResourceDependency}()
 
 """
