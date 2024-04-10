@@ -1,4 +1,6 @@
-struct CubeMap{T}
+abstract type EnvironmentMap{T} end
+
+struct CubeMap{T} <: EnvironmentMap{T}
   xp::Matrix{T}
   xn::Matrix{T}
   yp::Matrix{T}
@@ -6,6 +8,10 @@ struct CubeMap{T}
   zp::Matrix{T}
   zn::Matrix{T}
 end
+
+Base.eltype(::Type{CubeMap{T}}) where {T} = T
+
+Base.show(io::IO, cubemap::CubeMap) = print(io, CubeMap, " with 6x$(join(size(cubemap.xp), 'x')) ", eltype(typeof(cubemap)), " texels")
 
 check_number_of_images(images) = length(images) == 6 || throw(ArgumentError("Expected 6 face images for CubeMap, got $(length(images)) instead"))
 
@@ -27,12 +33,21 @@ function Lava.Resource(device::Device, cubemap::CubeMap)
   image_resource(device, data; name = :environment_cubemap, array_layers = 6)
 end
 
-struct Environment <: GraphicsShaderComponent
+struct EquirectangularMap{T} <: EnvironmentMap{T}
+  data::Matrix{T}
+end
+
+function Lava.Resource(device::Device, image::EquirectangularMap)
+  image_resource(device, image.data; name = :environment_equirectangular_image)
+end
+
+struct Environment{E<:EnvironmentMap} <: GraphicsShaderComponent
   texture::Texture
 end
 
-Environment(device::Device, cubemap::CubeMap) = Environment(Resource(device, cubemap))
-Environment(cubemap::Resource) = Environment(default_texture(cubemap))
+Environment(device::Device, cubemap::CubeMap) = Environment{typeof(cubemap)}(Resource(device, cubemap))
+Environment(device::Device, equirectangular::EquirectangularMap) = Environment{typeof(equirectangular)}(Resource(device, equirectangular))
+Environment{E}(resource::Resource) where {E<:EnvironmentMap} = Environment{E}(default_texture(resource))
 
 interface(env::Environment) = Tuple{Vector{Point3f},Nothing,Nothing}
 user_data(env::Environment, ctx) = DescriptorIndex(texture_descriptor(env.texture), ctx)
@@ -50,18 +65,89 @@ function environment_vert(position, direction, index, (; data)::PhysicalRef{Invo
   direction[] = @load data.vertex_data[index + 1U]::Vec3
 end
 
-function environment_frag(color, direction, (; data)::PhysicalRef{InvocationData}, textures)
+function environment_frag(::Type{C}, color, direction, (; data)::PhysicalRef{InvocationData}, textures) where {C<:EnvironmentMap}
   texture_index = @load data.user_data::DescriptorIndex
-  color.rgb = textures[texture_index](vec4(direction))
+  texture = textures[texture_index]
+  color.rgb = sample_along_direction(C, texture, direction)
   color.a = 1F
 end
 
-function Program(::Type{Environment}, device)
+function sample_along_direction(::Type{<:CubeMap}, texture, direction)
+  # Convert from Vulkan's right-handed to the cubemap sampler's left-handed coordinate system.
+  # To do this, perform an improper rotation, e.g. a mirroring along the Z-axis.
+  direction = Vec3(direction.x, direction.y, -direction.z)
+  texture(vec4(direction))
+end
+
+function sample_along_direction(::Type{<:EquirectangularMap}, texture, direction)
+  (x, y, z) = direction
+  # Remap equirectangular map coordinates into our coordinate system.
+  (x, y, z) = (-z, -x, y)
+  uv = spherical_uv_mapping(Vec3(x, y, z))
+  texture(uv)
+end
+
+function spherical_uv_mapping(direction)
+  (x, y, z) = normalize(direction)
+  # Angle in the XY plane, with respect to X.
+  ϕ = atan(y, x)
+  # Angle in the Zr plane, with respect to Z.
+  θ = acos(z)
+  u = 0.5F - ϕ/(2(π)F)
+  v = θ/((π)F)
+  Vec2(u, v)
+end
+
+function Program(::Type{Environment{C}}, device) where {C<:EnvironmentMap}
   vert = @vertex device environment_vert(::Vec4::Output{Position}, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device environment_frag(
+    ::Type{C},
     ::Vec4::Output,
     ::Vec3::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
-    ::Arr{2048,SPIRV.SampledImage{SPIRV.image_type(SPIRV.ImageFormatRgba16f, SPIRV.DimCube, 0, true, false, 1)}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
+    ::Arr{2048,SPIRV.SampledImage{SPIRV.image_type(C)}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
   Program(vert, frag)
 end
+
+SPIRV.image_type(::Type{CubeMap{T}}) where {T} = SPIRV.image_type(eltype_to_image_format(T), SPIRV.DimCube, 0, true, false, 1)
+SPIRV.image_type(::Type{CubeMap}) = SPIRV.image_type(CubeMap{RGBA{Float16}})
+SPIRV.image_type(::Type{EquirectangularMap{T}}) where {T} = SPIRV.image_type(eltype_to_image_format(T), SPIRV.Dim2D, 0, false, false, 1)
+SPIRV.image_type(::Type{EquirectangularMap}) = SPIRV.image_type(EquirectangularMap{RGBA{Float16}})
+
+CubeMap(device::Device, equirectangular::EquirectangularMap{TE}) where {TE} = CubeMap{TE}(device, equirectangular)
+function CubeMap{TC}(device::Device, equirectangular::EquirectangularMap{TE}) where {TC,TE}
+  (nx, ny) = size(equirectangular.data)
+  @assert nx == 2ny
+  n = ny
+  T = promote_type(TC, TE)
+  # Improvement: Make a single arrayed image (if color attachments with several layers are widely supported).
+  # Even if they are, a cubemap usage would probably not be supported, so would need still a transfer at the end.
+  face_attachments = [attachment_resource(device, zeros(T, n, n); usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT) for _ in 1:6]
+  faces = Matrix{T}[]
+  shader = Environment(device, equirectangular)
+  screen = screen_box(face_attachments[1])
+  for (face_attachment, directions) in zip(face_attachments, face_directions(CubeMap))
+    geometry = Primitive(Rectangle(screen, directions, nothing))
+    parameters = ShaderParameters(face_attachment)
+    # Improvement: Parallelize face rendering with `render!` and a manually constructed render graph.
+    # There is no need to synchronize sequentially with blocking functions as done here.
+    render(device, shader, parameters, geometry)
+    face = collect(face_attachment, device)
+    push!(faces, face)
+  end
+
+  CubeMap(faces)
+end
+
+function face_directions(::Type{<:CubeMap})
+  @SVector [
+    Point3f[(1, -1, -1), (1, -1, 1), (1, 1, -1), (1, 1, 1)],
+    Point3f[(-1, -1, 1), (-1, -1, -1), (-1, 1, 1), (-1, 1, -1)],
+    Point3f[(-1, 1, -1), (1, 1, -1), (-1, 1, 1), (1, 1, 1)],
+    Point3f[(-1, -1, 1), (1, -1, 1), (-1, -1, -1), (1, -1, -1)],
+    Point3f[(-1, -1, -1), (1, -1, -1), (-1, 1, -1), (1, 1, -1)],
+    Point3f[(1, -1, 1), (-1, -1, 1), (1, 1, 1), (-1, 1, 1)],
+  ]
+end
+
+Environment{C}(device::Device, image::EquirectangularMap) where {C<:CubeMap} = Environment(device, C(device, image))

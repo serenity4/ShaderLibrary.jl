@@ -49,4 +49,4 @@
     shader = LargeScaleErosion{Float32, typeof(model)}(model, maps)
     @test_broken compute(device, shader, ShaderParameters(), (32, 32, 1))
   end
-end
+end;

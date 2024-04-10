@@ -77,7 +77,8 @@ export
   Light, LightType, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, LIGHT_TYPE_DIRECTION,
 
   # Environment
-  CubeMap, Environment,
+  EnvironmentMap, CubeMap, EquirectangularMap,
+  Environment,
 
   # Graphics shader components
   GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL, GaussianBlur,

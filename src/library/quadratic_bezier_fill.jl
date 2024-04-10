@@ -56,18 +56,18 @@ struct QuadraticBezierPrimitiveData
   color::Vec3
 end
 
-function quadratic_bezier_fill_vert(position, frag_coordinates, frag_primitive_index::Vec{2,UInt32}, index, (; data)::PhysicalRef{InvocationData})
+function quadratic_bezier_fill_vert(position, uv, frag_primitive_index::Vec{2,UInt32}, index, (; data)::PhysicalRef{InvocationData})
   position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1U], data)
-  frag_coordinates[] = @load data.vertex_data[index + 1U]::Vec2
+  uv[] = @load data.vertex_data[index + 1U]::Vec2
   frag_primitive_index.x = @load data.primitive_indices[index + 1U]::UInt32
 end
 
-function quadratic_bezier_fill_frag(out_color, coordinates, primitive_index, (; data)::PhysicalRef{InvocationData})
+function quadratic_bezier_fill_frag(out_color, uv, primitive_index, (; data)::PhysicalRef{InvocationData})
   (; color, range, sharpness) = @load data.primitive_data[primitive_index.x]::QuadraticBezierPrimitiveData
   curves_start = DeviceAddress(UInt64(data.user_data) + 24*(first(range) - 1U))
   curves = PhysicalBuffer{Arr{3,Vec2}}(length(range), curves_start)
   out_color.rgb = color
-  out_color.a = clamp(intensity(coordinates, curves, range, 10sharpness), 0F, 1F)
+  out_color.a = clamp(intensity(uv, curves, range, 10sharpness), 0F, 1F)
 end
 
 function Program(::Type{QuadraticBezierFill}, device)

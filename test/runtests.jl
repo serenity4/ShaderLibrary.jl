@@ -1,5 +1,5 @@
 using ShaderLibrary
-using ShaderLibrary: glyph_quads, Text, linearize_index, image_index, GaussianBlurDirectionalComp, GaussianBlurComp
+using ShaderLibrary: glyph_quads, Text, linearize_index, image_index, GaussianBlurDirectionalComp, GaussianBlurComp, face_directions, spherical_uv_mapping
 using Test
 using GeometryExperiments: Point2, Point3f
 using Lava
@@ -10,6 +10,7 @@ using Erosion
 using OpenType
 using FileIO: load, save
 using SPIRV
+using ColorTypes: AbstractRGBA
 
 import GLTF
 

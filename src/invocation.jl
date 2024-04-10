@@ -85,16 +85,35 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
   end
 end
 
-function device_coordinates(xy, ar)
-  xmax, ymax = max(1F, ar), max(1F, 1F/ar)
+"""
+Turn aspect ratio independent `xy` 2D coordinates to aspect ratio dependent device coordinates.
+
+For example, if rendering on a viewport of 100x200 px, device coordinates consider the square [-1, 1] on either the X or Y axis to map into the full extent of the viewport, i.e. [-1, 1] -> [1, 100] pixels for the X coordinate and [-1, 1] -> [1, 200] pixels for the Y coordinate. This non-uniform scaling distorts objects, which this transform corrects.
+
+In the case where `aspect_ratio == 1`, this transformation has no effect.
+If `aspect_ratio > 1`, the viewport is wider than it is tall, and X coordinates between 1 and `aspect_ratio` in absolute value will fall outside the central square but within the rectangle viewport.
+If `aspect_ratio < 1`, the viewport is taller than it is wide, and Y coordinates between 1 and `1/aspect_ratio` in absolute value will fall outside the central square but within the rectangle viewport.
+
+See also: [`aspect_ratio`](@ref)
+"""
+function device_coordinates(xy, aspect_ratio)
+  xmax, ymax = max(1F, aspect_ratio), max(1F, 1F/aspect_ratio)
   remap.(xy, (-xmax, -ymax), (xmax, ymax), -1F, 1F)
 end
+
+"""
+Compute the aspect ratio from the given dimensions, taken as the ratio `width`/`height`.
+
+This aspect ratio is notably useful to compute distortion-free device coordinates; see [`device_coordinates`](@ref).
+"""
+function aspect_ratio end
 
 aspect_ratio(r::Resource) = aspect_ratio(dimensions(r.attachment))
 aspect_ratio(dims) = Float32(dims[1] / dims[2])
 aspect_ratio(::Nothing) = error("Dimensions must be specified for the reference attachment.")
 
 point3(x::Point{2}) = Point{3,eltype(x)}(x..., 0)
+point3(x) = convert(Point3f, x)
 point3(x::Point{3}) = x
 point4(x::Point{3}) = Point{4,eltype(x)}(x..., 1)
 point4(x::Point{4}) = x
@@ -108,6 +127,7 @@ vec3(x::Point{3}) = Vec3(x...)
 vec4(x::Vec{3}) = Vec4(x..., 1)
 vec4(x::Point{3}) = Vec4(x..., 1)
 vec4(x) = convert(Vec4, x)
+vec4(x, y, zs...) = vec4(Vec(x, y, zs...))
 
 world_to_screen_coordinates(position, data::InvocationData) = world_to_screen_coordinates(position, data.camera, data.aspect_ratio)
 function world_to_screen_coordinates(position, camera::Camera, aspect_ratio)
