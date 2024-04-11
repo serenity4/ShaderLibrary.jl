@@ -1,6 +1,10 @@
 @testset "Scene" begin
   @testset "Camera" begin
     camera = Camera(; focal_length = 0.35, far_clipping_plane = 10)
+    @test focal_length(camera) == 0.35F
+    @test field_of_view(camera) ≈ 2.4682431F
+    @test focal_length(field_of_view(camera)) ≈ 0.35F
+
     p = Vec3(0.4, 0.5, 1.7)
     p′ = project(p, camera)
     @test isa(p′, Vec3)

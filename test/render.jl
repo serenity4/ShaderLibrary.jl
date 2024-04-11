@@ -160,7 +160,7 @@
       uv = spherical_uv_mapping(Vec3(1, 0, 1))
       @test uv == Vec2(0.5, 0.25)
 
-      hs = [0xd3941e06837b58df, 0x8f59a7dd59eadec6, 0x3c8f8f5b3535ff3f, 0x8d9ce4330af39594, 0xa5192e2c31023afd, 0x45a62f8c8992d9ed]
+      hs = [0xd3941e06837b58df, 0x8f59a7dd59eadec6, (0x3c8f8f5b3535ff3f, 0xcc0b4c5a06ba5247), (0x8d9ce4330af39594, 0xccfeef55a725388c), 0xa5192e2c31023afd, 0x45a62f8c8992d9ed]
       for (directions, name, h) in zip(face_directions(CubeMap), fieldnames(CubeMap), hs)
         geometry = Primitive(Rectangle(screen, directions, nothing))
         render(device, shader, parameters_square, geometry)
@@ -185,6 +185,7 @@
   end
 
   @testset "Meshes" begin
+    gltf = read_gltf("cube.gltf")
     colors = Vec3[(0.43, 0.18, 0.68),
                   (0.76, 0.37, 0.76),
                   (0.02, 0.27, 0.27),
@@ -209,16 +210,23 @@
                   (0.91, 0.53, 0.98),
                   (0.16, 0.01, 0.53),
                   (0.49, 0.05, 0.38)]
-    mesh = import_mesh(read_gltf("cube.gltf"))
+    mesh = import_mesh(gltf)
     mesh = VertexMesh(mesh.encoding, mesh.vertex_locations; mesh.vertex_normals, vertex_data = colors)
-    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(RotationPlane(1.0, 0.0, 1.0), 0.3π)))
+    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
     grad = Gradient()
-    # XXX: Use a perspective projection here.
-    camera = Camera(near_clipping_plane = -2)
+    camera = import_camera(gltf)
     cube_parameters = setproperties(parameters, (; camera))
     render(device, grad, cube_parameters, primitive)
     data = collect(color, device)
-    save_test_render("colored_cube.png", data, 0xf9be050548419e80)
+    save_test_render("colored_cube_perspective.png", data, 0x77a9bdce8be2870b)
+    @reset camera.focal_length = 0
+    @reset camera.near_clipping_plane = -10
+    @reset camera.far_clipping_plane = 10
+    @reset camera.extent = (6F, 6F)
+    cube_parameters = setproperties(parameters, (; camera))
+    render(device, grad, cube_parameters, primitive)
+    data = collect(color, device)
+    save_test_render("colored_cube_orthographic.png", data, 0x140075b9eb6e9549)
   end
 
   @testset "PBR" begin
@@ -229,14 +237,15 @@
     prog = Program(typeof(pbr), device)
     @test isa(prog, Program)
 
-    mesh = import_mesh(read_gltf("cube.gltf"))
+    gltf = read_gltf("cube.gltf")
+    mesh = import_mesh(gltf)
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(RotationPlane(1.0, 0.0, 1.0), 0.3π)))
-    camera = Camera(near_clipping_plane = -2)
+    camera = import_camera(gltf)
     cube_parameters = setproperties(parameters, (; camera))
 
     render(device, pbr, cube_parameters, primitive)
     data = collect(color, device)
-    save_test_render("shaded_cube_pbr.png", data)
+    save_test_render("shaded_cube_pbr.png", data, 0x18e6e9146b6d3548)
 
     gltf = read_gltf("blob.gltf")
     bsdf = BSDF{Float32}((1.0, 0.0, 0.0), 0, 0.5, 0.02)
@@ -246,11 +255,9 @@
     camera = import_camera(gltf)
     mesh = import_mesh(gltf)
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = import_transform(gltf.nodes[end]; apply_rotation = false))
-    # XXX: Get the correct focal length during import instead of setting it manually.
-    cube_parameters = setproperties(parameters, (; camera = @set camera.focal_length = 4))
-
+    cube_parameters = setproperties(parameters; camera)
     render(device, pbr, cube_parameters, primitive)
     data = collect(color, device)
-    save_test_render("shaded_blob_pbr.png", data, 0x7cc86f14be09c215)
+    save_test_render("shaded_blob_pbr.png", data, 0x521c1f33e76c8ccd)
   end
 end;

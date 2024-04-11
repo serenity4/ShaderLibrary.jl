@@ -48,13 +48,10 @@ function import_camera(gltf::GLTF.Object, node::GLTF.Node)
   camera = gltf.cameras[node.camera]
   (; orthographic, perspective) = camera
   if !isnothing(perspective)
-    # XXX: The focal length may not be computed correctly.
-    α = perspective.yfov/2
-    focal_length = tan(α)/2
-    Camera(; focal_length, near_clipping_plane = perspective.znear, far_clipping_plane = perspective.zfar, transform)
+    Camera(; focal_length = focal_length(perspective.yfov), near_clipping_plane = perspective.znear, far_clipping_plane = perspective.zfar, transform)
   elseif !isnothing(orthographic)
-    # TODO: Use the `xmag`/`ymag` fields.
-    Camera(near_clipping_plane = orthographic.znear, far_clipping_plane = orthographic.zfar; transform)
+    extent = (orthographic.xmag, orthographic.ymag)
+    Camera(; extent, near_clipping_plane = orthographic.znear, far_clipping_plane = orthographic.zfar, transform)
   end
 end
 

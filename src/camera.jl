@@ -14,11 +14,26 @@ where 0 corresponds to a point on the near clipping plane, and 1 to one on
 the far clipping plane.
 """
 @struct_hash_equal_isapprox Base.@kwdef struct Camera
+  "Focal length (zero for an orthographic camera)."
   focal_length::Float32 = 0.0
+  """
+  Extent of the camera on the X and Y axes for orthographic projections.
+
+  This field is ignored for perspective projections.
+  """
+  extent::NTuple{2, Float32} = (2, 2)
   near_clipping_plane::Float32 = 0
   far_clipping_plane::Float32 = 100
   transform::Transform{3,Float32,Quaternion{Float32}} = Transform{3,Float32}()
 end
+
+"Get the focal length of the camera (in no specific unit)."
+focal_length(camera::Camera) = camera.focal_length
+"Get the field of view of the camera, in radians."
+field_of_view(camera::Camera) = field_of_view(focal_length(camera))
+
+field_of_view(focal_length) = 2atan(1/focal_length)
+focal_length(field_of_view) = 1/tan(field_of_view/2)
 
 """
 Project the point `p` through the given `camera`, computing its depth in the resulting Z coordinate.
@@ -54,9 +69,9 @@ function perspective_projection(p::Point3f, camera::Camera)
   # 3D world space -> camera local space.
   p = apply_transform_inverse(p, camera.transform)
   p = apply_fixed_camera_transform_inverse(p)
-  image_ratio = camera.focal_length/p.z
-  z = remap(p.z, camera.near_clipping_plane, camera.far_clipping_plane, 0F, 1F)
-  p′ = Point3f(p.x * image_ratio, p.y * image_ratio, z)
+  depth = remap(p.z, camera.near_clipping_plane, camera.far_clipping_plane, 0F, 1F)
+  scale = camera.focal_length/p.z
+  p′ = Point3f(p.x * scale, p.y * scale, depth)
 end
 
 """
@@ -69,8 +84,9 @@ function orthogonal_projection(p::Point3f, camera::Camera)
   p = apply_rotation(p, inv(camera.transform.rotation))
   p = apply_scaling(p, inv(camera.transform.scaling))
   p = apply_fixed_camera_transform_inverse(p)
-  z = remap(p.z, camera.near_clipping_plane, camera.far_clipping_plane, 0F, 1F)
-  p′ = Point3f(p.x, p.y, z)
+  depth = remap(p.z, camera.near_clipping_plane, camera.far_clipping_plane, 0F, 1F)
+  sx, sy = camera.extent ./ 2
+  p′ = Point3f(p.x/sx, p.y/sy, depth)
 end
 
 function screen_semidiagonal(aspect_ratio::Number)
