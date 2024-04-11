@@ -47,7 +47,12 @@ end
 
 Environment(device::Device, cubemap::CubeMap) = Environment{typeof(cubemap)}(Resource(device, cubemap))
 Environment(device::Device, equirectangular::EquirectangularMap) = Environment{typeof(equirectangular)}(Resource(device, equirectangular))
-Environment{E}(resource::Resource) where {E<:EnvironmentMap} = Environment{E}(default_texture(resource))
+function Environment{C}(resource::Resource) where {C<:EnvironmentMap}
+  texture = default_texture(resource)
+  # Make sure we don't have any seams.
+  @reset texture.sampling.address_modes = ntuple(_ -> Vk.SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 3)
+  Environment{C}(texture)
+end
 
 interface(env::Environment) = Tuple{Vector{Point3f},Nothing,Nothing}
 user_data(env::Environment, ctx) = DescriptorIndex(texture_descriptor(env.texture), ctx)
@@ -84,7 +89,12 @@ function sample_along_direction(::Type{<:EquirectangularMap}, texture, direction
   # Remap equirectangular map coordinates into our coordinate system.
   (x, y, z) = (-z, -x, y)
   uv = spherical_uv_mapping(Vec3(x, y, z))
-  texture(uv)
+  # Make sure we are using fine derivatives,
+  # given that there is a discontinuity along the `u` coordinate.
+  # This should already be the case for most hardware,
+  # but some may keep using coarse derivatives by default.
+  dx, dy = DPdxFine(uv), DPdyFine(uv)
+  texture(uv, dx, dy)
 end
 
 function spherical_uv_mapping(direction)
@@ -93,8 +103,13 @@ function spherical_uv_mapping(direction)
   ϕ = atan(y, x)
   # Angle in the Zr plane, with respect to Z.
   θ = acos(z)
-  u = 0.5F - ϕ/(2(π)F)
-  v = θ/((π)F)
+
+  # Normalize angles.
+  ϕ′ = ϕ/(2(π)F) # [-π, π] -> [-0.5, 0.5]
+  θ′ = θ/((π)F)  # [0, π]  -> [0, 1]
+
+  u = 0.5F - ϕ′
+  v = θ′
   Vec2(u, v)
 end
 

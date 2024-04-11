@@ -146,7 +146,7 @@
       @test uv == Vec2(0, 0.5)
       uv = spherical_uv_mapping(Vec3(0, -1, 0))
       @test uv == Vec2(0.75, 0.5)
-      uv = spherical_uv_mapping(Vec3(-1, -0.0001, 0))
+      uv = spherical_uv_mapping(Vec3(-1, prevfloat(0F), 0))
       @test uv ≈ Vec2(1, 0.5)
 
       uv = spherical_uv_mapping(Vec3(0, 0, 1))
@@ -160,8 +160,7 @@
       uv = spherical_uv_mapping(Vec3(1, 0, 1))
       @test uv == Vec2(0.5, 0.25)
 
-      # TODO: Fix visible seam in equirectangular sampling.
-      hs = [0xd3941e06837b58df, 0x8f59a7dd59eadec6, 0x1f4838a63489ace4, 0x4278af16f728013f, 0xa5192e2c31023afd, 0xb1023d3ba03c7b09]
+      hs = [0xd3941e06837b58df, 0x8f59a7dd59eadec6, 0x3c8f8f5b3535ff3f, 0x8d9ce4330af39594, 0xa5192e2c31023afd, 0x45a62f8c8992d9ed]
       for (directions, name, h) in zip(face_directions(CubeMap), fieldnames(CubeMap), hs)
         geometry = Primitive(Rectangle(screen, directions, nothing))
         render(device, shader, parameters_square, geometry)
@@ -171,13 +170,11 @@
 
       cubemap = CubeMap(device, equirectangular)
       shader = Environment(device, cubemap)
-      hs = [0xd3941e06837b58df, 0x8f59a7dd59eadec6, 0x1f4838a63489ace4, 0x4278af16f728013f, 0xa5192e2c31023afd, 0xb1023d3ba03c7b09]
       for (name, h) in zip(fieldnames(CubeMap), hs)
         val = getproperty(cubemap, name)
         save_test_render("equirectangular_to_cubemap_$name.png", val, h; keep = false)
       end
 
-      hs = [0xd3941e06837b58df, 0x8f59a7dd59eadec6, 0x1f4838a63489ace4, 0x4278af16f728013f, 0xa5192e2c31023afd, 0xb1023d3ba03c7b09]
       for (directions, name, h) in zip(face_directions(CubeMap), fieldnames(CubeMap), hs)
         geometry = Primitive(Rectangle(screen, directions, nothing))
         render(device, shader, parameters_square, geometry)
