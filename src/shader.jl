@@ -29,7 +29,10 @@ user_data(::ShaderComponent, ctx) = nothing
 renderables(cache::ProgramCache, shader::ShaderComponent, parameters::ShaderParameters, geometry, args...) = Command(cache, shader, parameters, geometry, args...)
 renderables(shader::ShaderComponent, parameters::ShaderParameters, device, args...) = renderables(ProgramCache(device), shader, parameters, args...)
 
-default_texture(image::Resource) = Texture(image, setproperties(DEFAULT_SAMPLING, (magnification = Vk.FILTER_LINEAR, minification = Vk.FILTER_LINEAR)))
+function default_texture(image::Resource; minification = Vk.FILTER_LINEAR, magnification = Vk.FILTER_LINEAR, kwargs...)
+  Texture(image, setproperties(DEFAULT_SAMPLING, (; minification, magnification, values(kwargs)...)))
+end
+const CLAMP_TO_EDGE = ntuple(_ -> Vk.SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 3)
 
 """
 Logical object that can be converted into a GPU rendering command as a `Command` (if available for a given component) or as

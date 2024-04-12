@@ -19,4 +19,16 @@ using ShaderLibrary: scatter_light_sources, compute_lighting
   # Notes for comparisons with Blender scenes:
   # - GLTF XYZ <=> Blender XZ(-Y)
   # - Blender XYZ <=> GLTF X(-Z)Y
+
+  equirectangular = EquirectangularMap(read_jpeg(asset("equirectangular.jpeg")))
+  environment = CubeMap(equirectangular, device)
+  irradiance = compute_irradiance(environment, device)
+
+  shader = Environment(device, irradiance)
+  screen = screen_box(color)
+  directions = face_directions(CubeMap)[1]
+  geometry = Primitive(Rectangle(screen, directions, nothing))
+  render(device, shader, parameters, geometry)
+  data = collect(color, device)
+  save_test_render("irradiance_nx.png", data, 0x79fb943ffff5eb4b)
 end;

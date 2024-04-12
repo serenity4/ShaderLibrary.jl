@@ -118,7 +118,6 @@
       @test isa(shader, Environment)
 
       hs = [0xd1a6f182e503cd7a, 0xa2491a5a7110082b, 0xcbfd32a0a2878353, 0x4ca916f836758feb, 0x4003c906192c6c9c, 0xaec665db4e257198]
-      empty!(device.shader_cache)
       for (directions, name, h) in zip(face_directions(CubeMap), fieldnames(CubeMap), hs)
         geometry = Primitive(Rectangle(screen, directions, nothing))
         render(device, shader, parameters_square, geometry)
@@ -168,7 +167,7 @@
         save_test_render("environment_equirectangular_$name.png", data, h; keep = false)
       end
 
-      cubemap = CubeMap(device, equirectangular)
+      cubemap = CubeMap(equirectangular, device)
       shader = Environment(device, cubemap)
       for (name, h) in zip(fieldnames(CubeMap), hs)
         val = getproperty(cubemap, name)

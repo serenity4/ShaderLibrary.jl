@@ -81,7 +81,7 @@ export
   Environment,
 
   # Graphics shader components
-  GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL, GaussianBlur,
+  GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL, GaussianBlur, IrradianceConvolution, compute_irradiance,
 
   # Compute shader components
   GammaCorrection,

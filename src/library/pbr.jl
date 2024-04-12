@@ -111,7 +111,8 @@ end
 
 # For a more elaborate tone mapping, see http://www.oscars.org/science-technology/sci-tech-projects/aces.
 hdr_tone_mapping(intensity) = intensity ./ (1F .+ intensity)
-gamma_corrected(color, γ) = color .^ (inv(γ))
+"Gamma correction warps a linear RGB range in a way that appears more realistic from a visual perception standpoint."
+gamma_corrected(color, γ = 2.2F) = color .^ (inv(γ))
 
 struct PBR{T} <: Material
   bsdf::BSDF{T}
@@ -131,7 +132,7 @@ function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{Invo
   color.rgb = compute_lighting(pbr.bsdf, position, normal, pbr.lights, camera)
   # XXX: Perform tone-mapping and gamma correction outside of the fragment shader.
   color.rgb = hdr_tone_mapping(color.rgb)
-  color.rgb = gamma_corrected(color.rgb, 2.2F)
+  color.rgb = gamma_corrected(color.rgb)
   color.a = 1F
 end
 user_data(pbr::PBR, ctx) = pbr

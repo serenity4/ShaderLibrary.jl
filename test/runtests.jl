@@ -23,7 +23,7 @@ parameters = ShaderParameters(color)
 
 @testset "ShaderLibrary.jl" begin
     include("scene.jl")
-    include("pbr.jl")
     include("render.jl")
+    include("pbr.jl")
     include("compute.jl")
 end;

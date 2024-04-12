@@ -47,10 +47,10 @@ end
 
 Environment(device::Device, cubemap::CubeMap) = Environment{typeof(cubemap)}(Resource(device, cubemap))
 Environment(device::Device, equirectangular::EquirectangularMap) = Environment{typeof(equirectangular)}(Resource(device, equirectangular))
+
 function Environment{C}(resource::Resource) where {C<:EnvironmentMap}
-  texture = default_texture(resource)
   # Make sure we don't have any seams.
-  @reset texture.sampling.address_modes = ntuple(_ -> Vk.SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 3)
+  texture = default_texture(resource; address_modes = CLAMP_TO_EDGE)
   Environment{C}(texture)
 end
 
@@ -129,8 +129,8 @@ SPIRV.image_type(::Type{CubeMap}) = SPIRV.image_type(CubeMap{RGBA{Float16}})
 SPIRV.image_type(::Type{EquirectangularMap{T}}) where {T} = SPIRV.image_type(eltype_to_image_format(T), SPIRV.Dim2D, 0, false, false, 1)
 SPIRV.image_type(::Type{EquirectangularMap}) = SPIRV.image_type(EquirectangularMap{RGBA{Float16}})
 
-CubeMap(device::Device, equirectangular::EquirectangularMap{TE}) where {TE} = CubeMap{TE}(device, equirectangular)
-function CubeMap{TC}(device::Device, equirectangular::EquirectangularMap{TE}) where {TC,TE}
+CubeMap(equirectangular::EquirectangularMap{TE}, device::Device) where {TE} = CubeMap{TE}(equirectangular, device)
+function CubeMap{TC}(equirectangular::EquirectangularMap{TE}, device::Device) where {TC,TE}
   (nx, ny) = size(equirectangular.data)
   @assert nx == 2ny
   n = ny
@@ -166,3 +166,89 @@ function face_directions(::Type{<:CubeMap})
 end
 
 Environment{C}(device::Device, image::EquirectangularMap) where {C<:CubeMap} = Environment(device, C(device, image))
+
+struct IrradianceConvolution{C<:CubeMap} <: GraphicsShaderComponent
+  texture::Texture
+end
+
+IrradianceConvolution{C}(resource::Resource) where {C<:CubeMap} = IrradianceConvolution{C}(default_texture(resource; address_modes = CLAMP_TO_EDGE))
+IrradianceConvolution(environment::CubeMap, device) = IrradianceConvolution{typeof(environment)}(Resource(device, environment))
+
+interface(shader::IrradianceConvolution) = Tuple{Vector{Point3f},Nothing,Nothing}
+user_data(shader::IrradianceConvolution, ctx) = DescriptorIndex(texture_descriptor(shader.texture), ctx)
+resource_dependencies(shader::IrradianceConvolution) = @resource_dependencies begin
+  @read shader.texture.image::Texture
+end
+
+function convolve_hemisphere(f, ::Type{T}, center, dθ, dϕ) where {T}
+  value = zero(T)
+  nθ = 1U + (fld(πF, 2dϕ))U
+  nϕ = 1U + (fld(2πF, dθ))U
+  n = nθ * nϕ
+  q = Rotation(Point3f(0, 0, 1), point3(center))
+  θ = 0F
+  for i in 1U:nθ
+    θ += dθ
+    ϕ = 0F
+    for j in 1U:nϕ
+      ϕ += dϕ
+      sinθ, cosθ = sincos(θ)
+      sinϕ, cosϕ = sincos(ϕ)
+      direction = Point(sinθ * cosϕ, sinθ * sinϕ, cosθ)
+      direction = apply_rotation(direction, q)
+      # Sum the new value, weighted by sinθ to balance out the skewed distribution toward the pole.
+      value = value .+ f(vec4(direction), θ, ϕ) .* sinθ
+    end
+  end
+  value ./ n
+end
+
+function irradiance_convolution_vert(position, center, index, (; data)::PhysicalRef{InvocationData})
+  position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1], data)
+  position.z = 1
+  center[] = @load data.vertex_data[index + 1]::Vec3
+end
+
+function irradiance_convolution_frag(::Type{<:CubeMap}, irradiance, center, (; data)::PhysicalRef{InvocationData}, textures)
+  texture_index = @load data.user_data::DescriptorIndex
+  texture = textures[texture_index]
+  dθ = 0.025F
+  dϕ = 0.025F
+  value = convolve_hemisphere(Vec3, center, dθ, dϕ) do direction, θ, ϕ
+    texture(direction).rgb .* cos(θ)
+  end
+  irradiance.rgb = value .* πF
+  irradiance.a = 1F
+end
+
+function Program(::Type{IrradianceConvolution{C}}, device) where {C}
+  vert = @vertex device irradiance_convolution_vert(::Vec4::Output{Position}, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+  frag = @fragment device irradiance_convolution_frag(
+    ::Type{C},
+    ::Vec4::Output,
+    ::Vec3::Input,
+    ::PhysicalRef{InvocationData}::PushConstant,
+    ::Arr{2048,SPIRV.SampledImage{SPIRV.image_type(C)}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
+  Program(vert, frag)
+end
+
+compute_irradiance(environment::CubeMap{T}, device::Device) where {T} = compute_irradiance(CubeMap{T}, Resource(device, environment), device)
+
+function compute_irradiance(::Type{CubeMap{T}}, environment::Resource, device::Device) where {T}
+  # Use small attachments, as irradiance cubemaps don't have high-frequency details.
+  n = 32
+  face_attachments = [attachment_resource(device, zeros(T, n, n); usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT) for _ in 1:6]
+  shader = IrradianceConvolution{CubeMap{T}}(environment)
+  screen = screen_box(face_attachments[1])
+  faces = Matrix{T}[]
+  for (face_attachment, directions) in zip(face_attachments, face_directions(CubeMap))
+    geometry = Primitive(Rectangle(screen, directions, nothing))
+    parameters = ShaderParameters(face_attachment)
+    # Improvement: Parallelize face rendering with `render!` and a manually constructed render graph.
+    # There is no need to synchronize sequentially with blocking functions as done here.
+    render(device, shader, parameters, geometry)
+    face = collect(face_attachment, device)
+    push!(faces, face)
+  end
+  CubeMap(faces)
+end
