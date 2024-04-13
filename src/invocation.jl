@@ -100,7 +100,7 @@ Here are notable transformations:
 - `Vector{T1}` -> `PhysicalBuffer{T2}` (if `T2` is provided as first argument to `instantiate`)
 - `Texture` -> `DescriptorIndex`
 
-This function may be extended as `instantiate(data::T1, ctx::InvocationDataContext) -> T2` to perform an instantiation from `T1` into `T2`; then, `instantiate(T2, data::Vector{T1}, ctx)` will generate an appropriate `PhysicalBuffer{T2}`
+This function may be extended as `instantiate(data::T1, ctx::InvocationDataContext) -> T2` to perform an instantiation from `T1` into `T2`; then, `instantiate(T2, data::Vector{T1}, ctx)` will generate an appropriate `PhysicalBuffer{T2}`.
 """
 function instantiate end
 
@@ -112,7 +112,7 @@ function instantiate(::Type{T}, data::AbstractVector, ctx::InvocationDataContext
   isempty(data) && return PhysicalBuffer{T}()
   result = T[]
   for x in data
-    push!(result, instantiate(T, x, ctx))
+    push!(result, instantiate(x, ctx)::T)
   end
   instantiate(result, ctx)
 end

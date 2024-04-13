@@ -66,7 +66,7 @@ export
   Gradient,
   Sprite,
   QuadraticBezierFill, QuadraticBezierPrimitiveData,
-  PBR, BSDF, PointLight,
+  PBR, BSDF,
 
   # Geometries
   Rectangle,
@@ -75,6 +75,7 @@ export
 
   # Lights
   Light, LightType, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, LIGHT_TYPE_DIRECTION,
+  LightProbe,
 
   # Environment
   EnvironmentMap, CubeMap, EquirectangularMap,

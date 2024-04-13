@@ -1,5 +1,3 @@
-using ShaderLibrary: scatter_light_sources, compute_lighting_from_sources
-
 @testset "Physically-based rendering" begin
   gltf = read_gltf("blob.gltf")
   lights = import_lights(gltf)
@@ -32,4 +30,39 @@ using ShaderLibrary: scatter_light_sources, compute_lighting_from_sources
   render(device, shader, parameters, geometry)
   data = collect(color, device)
   save_test_render("irradiance_nx.png", data, 0xe60d0e8e44988431)
+
+  bsdf = BSDF{Float32}((1.0, 1.0, 1.0), 0.0, 0.1, 0.5)
+  lights = [Light{Float32}(LIGHT_TYPE_POINT, (2.0, 1.0, 1.0), (1.0, 1.0, 1.0), 1.0)]
+  pbr = PBR(bsdf, lights)
+  prog = Program(typeof(pbr), device)
+  @test isa(prog, Program)
+
+  gltf = read_gltf("cube.gltf")
+  mesh = import_mesh(gltf)
+  primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(RotationPlane(1.0, 0.0, 1.0), 0.3π)))
+  camera = import_camera(gltf)
+  pbr_parameters = setproperties(parameters, (; camera))
+
+  render(device, pbr, pbr_parameters, primitive)
+  data = collect(color, device)
+  save_test_render("shaded_cube_pbr.png", data, 0x18e6e9146b6d3548)
+
+  gltf = read_gltf("blob.gltf")
+  bsdf = BSDF{Float32}((1.0, 0.0, 0.0), 0, 0.5, 0.02)
+  camera = import_camera(gltf)
+  mesh = import_mesh(gltf)
+  primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = import_transform(gltf.nodes[end]; apply_rotation = false))
+  pbr_parameters = setproperties(parameters; camera)
+
+  lights = import_lights(gltf)
+  pbr = PBR(bsdf, lights)
+  render(device, pbr, pbr_parameters, primitive)
+  data = collect(color, device)
+  save_test_render("shaded_blob_pbr.png", data, 0x0a88cecb62247e2d)
+
+  probe = LightProbe(irradiance, irradiance, device)
+  pbr = PBR(bsdf, lights, [probe])
+  render(device, pbr, pbr_parameters, primitive)
+  data = collect(color, device)
+  save_test_render("shaded_blob_pbr_ibl.png", data, 0x0a88cecb62247e2d)
 end;

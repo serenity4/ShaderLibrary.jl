@@ -227,34 +227,4 @@
     data = collect(color, device)
     save_test_render("colored_cube_orthographic.png", data, 0x140075b9eb6e9549)
   end
-
-  @testset "PBR" begin
-    bsdf = BSDF{Float32}((1.0, 1.0, 1.0), 0.0, 0.1, 0.5)
-    lights = [Light{Float32}(LIGHT_TYPE_POINT, (2.0, 1.0, 1.0), (1.0, 1.0, 1.0), 1.0)]
-    pbr = PBR(bsdf, lights)
-    prog = Program(typeof(pbr), device)
-    @test isa(prog, Program)
-
-    gltf = read_gltf("cube.gltf")
-    mesh = import_mesh(gltf)
-    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(RotationPlane(1.0, 0.0, 1.0), 0.3π)))
-    camera = import_camera(gltf)
-    cube_parameters = setproperties(parameters, (; camera))
-
-    render(device, pbr, cube_parameters, primitive)
-    data = collect(color, device)
-    save_test_render("shaded_cube_pbr.png", data, 0x18e6e9146b6d3548)
-
-    gltf = read_gltf("blob.gltf")
-    bsdf = BSDF{Float32}((1.0, 0.0, 0.0), 0, 0.5, 0.02)
-    lights = import_lights(gltf)
-    pbr = PBR(bsdf, lights)
-    camera = import_camera(gltf)
-    mesh = import_mesh(gltf)
-    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = import_transform(gltf.nodes[end]; apply_rotation = false))
-    cube_parameters = setproperties(parameters; camera)
-    render(device, pbr, cube_parameters, primitive)
-    data = collect(color, device)
-    save_test_render("shaded_blob_pbr.png", data, 0x0a88cecb62247e2d)
-  end
 end;
