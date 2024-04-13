@@ -24,7 +24,7 @@ function Program(::Type{Sprite}, device)
 end
 
 interface(::Sprite) = Tuple{Vector{Vec2},Nothing,Nothing}
-user_data(sprite::Sprite, ctx) = DescriptorIndex(texture_descriptor(sprite.texture), ctx)
+user_data(sprite::Sprite, ctx) = instantiate(sprite.texture, ctx)
 resource_dependencies(sprite::Sprite) = @resource_dependencies begin
   @read sprite.texture.image::Texture
 end

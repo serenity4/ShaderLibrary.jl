@@ -5,7 +5,7 @@ using GeometryExperiments: Point2, Point3f
 using Lava
 using Accessors: @set, @reset, setproperties
 using SPIRV.MathFunctions
-using SPIRV: @compile, validate, F, U, Vec2, Vec3, unwrap
+using SPIRV: @compile, validate, F, U, πF, Vec2, Vec3, unwrap
 using Erosion
 using OpenType
 using FileIO: load, save

@@ -27,17 +27,22 @@ function CubeMap(images::AbstractVector{T}) where {T<:Matrix}
   CubeMap(@SVector [xp, xn, yp, yn, zp, zn])
 end
 
-function Lava.Resource(device::Device, cubemap::CubeMap)
+function Lava.Resource(cubemap::CubeMap, device::Device)
   (; xp, xn, yp, yn, zp, zn) = cubemap
   data = [xp, xn, yp, yn, zp, zn]
   image_resource(device, data; name = :environment_cubemap, array_layers = 6)
+end
+
+function Lava.Texture(cubemap::CubeMap, device::Device)
+  resource = Resource(cubemap, device)
+  default_texture(resource; address_modes = CLAMP_TO_EDGE)
 end
 
 struct EquirectangularMap{T} <: EnvironmentMap{T}
   data::Matrix{T}
 end
 
-function Lava.Resource(device::Device, image::EquirectangularMap)
+function Lava.Resource(image::EquirectangularMap, device::Device)
   image_resource(device, image.data; name = :environment_equirectangular_image)
 end
 
@@ -45,8 +50,8 @@ struct Environment{E<:EnvironmentMap} <: GraphicsShaderComponent
   texture::Texture
 end
 
-Environment(device::Device, cubemap::CubeMap) = Environment{typeof(cubemap)}(Resource(device, cubemap))
-Environment(device::Device, equirectangular::EquirectangularMap) = Environment{typeof(equirectangular)}(Resource(device, equirectangular))
+Environment(cubemap::CubeMap, device::Device) = Environment{typeof(cubemap)}(Resource(cubemap, device))
+Environment(equirectangular::EquirectangularMap, device::Device) = Environment{typeof(equirectangular)}(Resource(equirectangular, device))
 
 function Environment{C}(resource::Resource) where {C<:EnvironmentMap}
   # Make sure we don't have any seams.
@@ -55,7 +60,7 @@ function Environment{C}(resource::Resource) where {C<:EnvironmentMap}
 end
 
 interface(env::Environment) = Tuple{Vector{Point3f},Nothing,Nothing}
-user_data(env::Environment, ctx) = DescriptorIndex(texture_descriptor(env.texture), ctx)
+user_data(env::Environment, ctx) = instantiate(env.texture, ctx)
 resource_dependencies(env::Environment) = @resource_dependencies begin
   @read env.texture.image::Texture
 end
@@ -105,8 +110,8 @@ function spherical_uv_mapping(direction)
   θ = acos(z)
 
   # Normalize angles.
-  ϕ′ = ϕ/(2(π)F) # [-π, π] -> [-0.5, 0.5]
-  θ′ = θ/((π)F)  # [0, π]  -> [0, 1]
+  ϕ′ = ϕ/2πF # [-π, π] -> [-0.5, 0.5]
+  θ′ = θ/πF  # [0, π]  -> [0, 1]
 
   u = 0.5F - ϕ′
   v = θ′
@@ -139,7 +144,7 @@ function CubeMap{TC}(equirectangular::EquirectangularMap{TE}, device::Device) wh
   # Even if they are, a cubemap usage would probably not be supported, so would need still a transfer at the end.
   face_attachments = [attachment_resource(device, zeros(T, n, n); usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT) for _ in 1:6]
   faces = Matrix{T}[]
-  shader = Environment(device, equirectangular)
+  shader = Environment(equirectangular, device)
   screen = screen_box(face_attachments[1])
   for (face_attachment, directions) in zip(face_attachments, face_directions(CubeMap))
     geometry = Primitive(Rectangle(screen, directions, nothing))
@@ -165,17 +170,17 @@ function face_directions(::Type{<:CubeMap})
   ]
 end
 
-Environment{C}(device::Device, image::EquirectangularMap) where {C<:CubeMap} = Environment(device, C(device, image))
+Environment{C}(device::Device, image::EquirectangularMap) where {C<:CubeMap} = Environment(C(device, image, device))
 
 struct IrradianceConvolution{C<:CubeMap} <: GraphicsShaderComponent
   texture::Texture
 end
 
 IrradianceConvolution{C}(resource::Resource) where {C<:CubeMap} = IrradianceConvolution{C}(default_texture(resource; address_modes = CLAMP_TO_EDGE))
-IrradianceConvolution(environment::CubeMap, device) = IrradianceConvolution{typeof(environment)}(Resource(device, environment))
+IrradianceConvolution(environment::CubeMap, device) = IrradianceConvolution{typeof(environment)}(Resource(environment, device))
 
 interface(shader::IrradianceConvolution) = Tuple{Vector{Point3f},Nothing,Nothing}
-user_data(shader::IrradianceConvolution, ctx) = DescriptorIndex(texture_descriptor(shader.texture), ctx)
+user_data(shader::IrradianceConvolution, ctx) = instantiate(shader.texture, ctx)
 resource_dependencies(shader::IrradianceConvolution) = @resource_dependencies begin
   @read shader.texture.image::Texture
 end
@@ -232,7 +237,7 @@ function Program(::Type{IrradianceConvolution{C}}, device) where {C}
   Program(vert, frag)
 end
 
-compute_irradiance(environment::CubeMap{T}, device::Device) where {T} = compute_irradiance(CubeMap{T}, Resource(device, environment), device)
+compute_irradiance(environment::CubeMap{T}, device::Device) where {T} = compute_irradiance(CubeMap{T}, Resource(environment, device), device)
 
 function compute_irradiance(::Type{CubeMap{T}}, environment::Resource, device::Device) where {T}
   # Use small attachments, as irradiance cubemaps don't have high-frequency details.

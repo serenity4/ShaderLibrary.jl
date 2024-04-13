@@ -13,7 +13,7 @@
 # f₉₀ | Reflectance at grazing angle
 
 # https://google.github.io/filament/Filament.html#listing_speculard
-specular_normal_distribution_ggx_fp32(α, n, h) = α^2/((π)F * ((n ⋅ h)^2 * (α^2 - 1) + 1)^2)
+specular_normal_distribution_ggx_fp32(α, n, h) = α^2/(πF * ((n ⋅ h)^2 * (α^2 - 1) + 1)^2)
 
 # https://google.github.io/filament/Filament.html#listing_speculardfp16
 specular_normal_distribution_ggx_fp16(α, n, h) = min((α / (((n × h) ⋅ (n × h)) + ((n ⋅ h) * α)^2))^2 / Float16(π), floatmax(Float16))
@@ -45,10 +45,10 @@ function brdf_diffuse_disney(α, n, v, l, h, f₀)
   f₉₀ = 0.5F + 2α * (l ⋅ h)^2
   light_scatter = fresnel_schlick(n ⋅ l, f₀, f₉₀)
   view_scatter = fresnel_schlick(n ⋅ v, f₀, f₉₀)
-  light_scatter .* view_scatter ./ (π)F
+  light_scatter .* view_scatter ./ πF
 end
 
-lambertian_diffuse_brdf(albedo) = albedo / (π)F
+lambertian_diffuse_brdf(albedo) = albedo / πF
 
 # Parametrization as described in Section 4.8 of https://google.github.io/filament/Filament.html
 struct BSDF{T<:Real}
@@ -114,10 +114,41 @@ hdr_tone_mapping(intensity) = intensity ./ (1F .+ intensity)
 "Gamma correction warps a linear RGB range in a way that appears more realistic from a visual perception standpoint."
 gamma_corrected(color, γ = 2.2F) = color .^ (inv(γ))
 
-struct PBR{T} <: Material
-  bsdf::BSDF{T}
-  lights::PhysicalBuffer{Light{T}}
+struct LightProbe{T,R<:Union{Texture,DescriptorIndex}}
+  irradiance::R # cubemap
+  prefiltered_environment::R # cubemap
+  function LightProbe{T}(irradiance::R, prefiltered_environment::R) where {T,R<:Union{Texture,DescriptorIndex}}
+    new{T,R}(irradiance, prefiltered_environment)
+  end
 end
+function LightProbe(irradiance::CubeMap{T}, prefiltered_environment::CubeMap{T}, device::Device) where {T}
+  irradiance = Texture(irradiance, device)
+  prefiltered_environment = Texture(prefiltered_environment, device)
+  LightProbe{T}(irradiance, prefiltered_environment)
+end
+
+const DEFAULT_LIGHT_PROBE_ELTYPE = RGBA{Float16}
+const DEFAULT_LIGHT_PROBE_TYPE = LightProbe{DEFAULT_LIGHT_PROBE_ELTYPE,Texture}
+
+function instantiate(probe::LightProbe{P,Texture}, ctx::InvocationDataContext) where {P}
+  irradiance = DescriptorIndex(probe.irradiance, ctx)
+  prefiltered_environment = DescriptorIndex(probe.prefiltered_environment, ctx)
+  LightProbe{P}(irradiance, prefiltered_environment)
+end
+
+struct PBR{T<:Real,P,LT<:vector_data(Light{T}), LP<:vector_data(LightProbe{P,Texture},LightProbe{P,DescriptorIndex})} <: Material
+  bsdf::BSDF{T}
+  lights::LT
+  probes::LP
+end
+
+PBR(bsdf::BSDF{T}, args...) where {T} = PBR{T}(bsdf, args...)
+PBR{T}(bsdf::BSDF{T}, lights::vector_data(Light{T}) = Light{T}[]) where {T} = PBR{T}(bsdf, lights, DEFAULT_LIGHT_PROBE_TYPE[])
+PBR{T}(bsdf::BSDF{T}, probes) where {T} = PBR{T}(bsdf, PhysicalBuffer{Light{T}}(), probes)
+PBR{T}(bsdf::BSDF{T}, lights::vector_data(Light{T}), probes::vector_data(LightProbe{P})) where {T,P} = PBR{T,P}(bsdf, lights, probes)
+PBR{T,P}(bsdf::BSDF{T}, lights::vector_data(Light{T})) where {T,P} = PBR{T,P}(bsdf, lights, DEFAULT_LIGHT_PROBE_TYPE[])
+PBR{T,P}(bsdf::BSDF{T}, probes::vector_data(LightProbe)) where {T,P} = PBR{T,P}(bsdf, Light{T}[], probes)
+PBR{T,P}(bsdf::BSDF{T}, lights::LT, probes::LP) where {T,P,LT<:vector_data(Light{T}),LP<:vector_data(LightProbe{P,Texture},LightProbe{P,DescriptorIndex})} = PBR{T,P,LT,LP}(bsdf, lights, probes)
 
 function pbr_vert(position, frag_position, frag_normal, index, (; data)::PhysicalRef{InvocationData})
   frag_position[] = data.vertex_locations[index + 1U]
@@ -125,33 +156,31 @@ function pbr_vert(position, frag_position, frag_normal, index, (; data)::Physica
   position.xyz = world_to_screen_coordinates(frag_position, data)
 end
 
-function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{InvocationData}) where {T}
+function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{InvocationData}, textures) where {T<:PBR}
   (; camera) = data
-  pbr = @load data.user_data::PBR{T}
-  # scattered = scatter_light_sources(pbr.bsdf, position, normal, pbr.lights, camera)
-  color.rgb = compute_lighting(pbr.bsdf, position, normal, pbr.lights, camera)
+  pbr = @load data.user_data::T
+  color.rgb = compute_lighting_from_sources(pbr, position, normal, camera)
+  color.rgb += compute_lighting_from_probes(pbr, position, normal, camera, textures)
   # XXX: Perform tone-mapping and gamma correction outside of the fragment shader.
   color.rgb = hdr_tone_mapping(color.rgb)
   color.rgb = gamma_corrected(color.rgb)
   color.a = 1F
 end
-user_data(pbr::PBR, ctx) = pbr
+user_data(pbr::PBR{<:Any,P}, ctx::InvocationDataContext) where {P} = PBR(pbr.bsdf, instantiate(pbr.lights, ctx), instantiate(LightProbe{P,DescriptorIndex}, pbr.probes, ctx))
 interface(::PBR) = Tuple{Nothing, Nothing, Nothing}
 
-function Program(::Type{PBR{T}}, device) where {T}
+function Program(::Type{<:PBR{T,P}}, device) where {T,P}
   vert = @vertex device pbr_vert(::Vec4::Output{Position}, ::Vec3::Output, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device pbr_frag(
-    ::Type{T},
+    ::Type{PBR{T,P,PhysicalBuffer{Light{T}},PhysicalBuffer{LightProbe{P,DescriptorIndex}}}},
     ::Vec4::Output,
     ::Point3f::Input,
     ::SVector{3,Float32}::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
+    ::Arr{2048,SPIRV.SampledImage{SPIRV.image_type(CubeMap{P})}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)}
   )
   Program(vert, frag)
 end
-
-
-
 
 # ----------------------------------
 # https://learnopengl.com/PBR/Theory
@@ -166,7 +195,7 @@ microfacet_scattering(α, sₕ) = microfacet_scattering_trowbridge_reitz_ggx(α,
 
 function microfacet_scattering_trowbridge_reitz_ggx(α, sₕ)
   α² = α^2
-  α² / ((π)F * (sₕ^2 * (α² - 1) + 1)^2)
+  α² / (πF * (sₕ^2 * (α² - 1) + 1)^2)
 end
 
 """
@@ -189,10 +218,16 @@ remap_roughness_image_based_lighting(α) = α^2/2
 """
 Describes the ratio of surface reflection at different surface angles.
 
-Uses the Fresnel equation, which interpolates between an incident factor f₀ and a tangent factor f₉₀ (often taken to be zero - no light reflected for a tangential ray).
+Uses the Fresnel equation, which sort of interpolates between an incident factor f₀ and a tangent factor f₉₀ (often taken to be pure white - in general, light is fully reflected achromatically for a tangential ray).
 """
 surface_reflection(s, f₀) = surface_reflection_fresnel(s, f₀)
-surface_reflection_fresnel(s, f₀) = lerp(one(s), pow5(one(s) - s), f₀)
+surface_reflection_fresnel(s, f₀, f₉₀ = one(s)) = f₀ + (f₉₀ .- f₀) * pow5(one(s) - s)
+"""
+Describes the ratio of surface reflection at different surface angles, suited for image-based lighting.
+
+This is the same as [`surface_reflection`](@ref), but with a roughness term that approximately corrects a bias introduced by the averaging mechanism from image-based lighting.
+"""
+surface_reflection_ibl(s, f₀, α, f₉₀ = one(s)) = f₀ + (max.(f₉₀ .- α, f₀) .- f₀) * pow5(one(s) - s)
 
 """
 - `α`: roughness factor.
@@ -211,17 +246,17 @@ end
 
 shape_factor(x::AbstractVector{T}, y::AbstractVector{T}) where {T} = max(x ⋅ y, zero(T))
 
-function compute_lighting(bsdf::BSDF{T}, position, normal, light::Light, view) where {T}
-  sᵥ = shape_factor(normal, view)
+function compute_lighting_from_source(bsdf::BSDF{T}, light::Light, position, normal, view) where {T}
   light_direction = normalize(light.position - position)
-  sₗ = shape_factor(normal, light_direction)
   halfway_direction = normalize(light_direction + view)
   sₕ = shape_factor(normal, halfway_direction)
-  f₀ = lerp(bsdf.base_color, @SVector(ones(T, 3)) .* 0.04F, bsdf.metallic)
+  f₀ = lerp(bsdf.base_color, (0.04F)one(T), bsdf.metallic)
   α = bsdf.roughness
-  kₛ = surface_reflection(max(halfway_direction ⋅ view, zero(T)), f₀)
-  kd = @SVector(ones(T, 3)) .- kₛ
+  kₛ = surface_reflection(shape_factor(halfway_direction, view), f₀)
+  kd = one(T) .- kₛ
   kd *= one(T) - bsdf.metallic
+  sᵥ = shape_factor(normal, view)
+  sₗ = shape_factor(normal, light_direction)
   specular = cook_torrance_specular_brdf(α, sᵥ, sₗ, sₕ)
   diffuse = lambertian_diffuse_brdf(bsdf.base_color)
   brdf = kₛ .* specular .+ kd .* diffuse
@@ -230,11 +265,37 @@ function compute_lighting(bsdf::BSDF{T}, position, normal, light::Light, view) w
   radiance(light, position) .* sₗ .* scattering
 end
 
-function compute_lighting(bsdf::BSDF{T}, position, normal, lights, camera::Camera) where {T}
+function compute_lighting_from_sources(pbr::PBR{T}, position, normal, camera::Camera) where {T}
   res = zero(Point{3,T})
-  view = normalize(camera.transform.translation.vec - position)
-  for light in lights
-    res += compute_lighting(bsdf, position, normal, light, view)
+  camera_position = apply_translation(zero(Point{3,T}), camera.transform)
+  view = normalize(camera_position - position)
+  for light in pbr.lights
+    res += compute_lighting_from_source(pbr.bsdf, light, position, normal, view)
+  end
+  res
+end
+
+function compute_lighting_from_probe(bsdf::BSDF{T}, probe::LightProbe{P}, normal, view, textures) where {T,P}
+  f₀ = lerp(bsdf.base_color, @SVector(ones(T, 3)) .* 0.04F, bsdf.metallic)
+  α = bsdf.roughness
+  kₛ = surface_reflection_ibl(shape_factor(normal, view), f₀, α)
+  kd = one(T) .- kₛ
+  irradiance = point3(textures[probe.irradiance](vec4(normal)).rgb)
+  diffuse = bsdf.base_color .* irradiance
+  # XXX: Implement specular lighting.
+  specular = zero(Point3f)
+  brdf = kₛ .* specular .+ kd .* diffuse
+  btdf = one(T)
+  scattering = brdf .* btdf
+  scattering
+end
+
+function compute_lighting_from_probes(pbr::PBR{T}, position, normal, camera::Camera, textures) where {T}
+  res = zero(Point{3,T})
+  camera_position = apply_translation(zero(Point{3,T}), camera.transform)
+  view = normalize(camera_position - position)
+  for probe in pbr.probes
+    res += compute_lighting_from_probe(pbr.bsdf, probe, normal, view, textures)
   end
   res
 end

@@ -30,7 +30,7 @@ function y_up_to_z_up(sc::Scaling)
 end
 function apply_y_up_to_z_up_rotation(q::Quaternion)
   # Define rotation along X axis.
-  qᵣₓ = Quaternion(RotationPlane(1F, 0F, 0F), (π)F/2)
+  qᵣₓ = Quaternion(RotationPlane(1F, 0F, 0F), πF/2)
   # Apply the rotation using matrices.
   q′ = Quaternion(SMatrix{3,3}(qᵣₓ) * SMatrix{3,3}(q))
   # Negate w component. Not sure why it's needed, but it's needed.

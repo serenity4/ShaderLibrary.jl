@@ -1,4 +1,4 @@
-using ShaderLibrary: scatter_light_sources, compute_lighting
+using ShaderLibrary: scatter_light_sources, compute_lighting_from_sources
 
 @testset "Physically-based rendering" begin
   gltf = read_gltf("blob.gltf")
@@ -13,7 +13,8 @@ using ShaderLibrary: scatter_light_sources, compute_lighting
   scattered = scatter_light_sources(bsdf, position, normal, lights, camera)
   @test all(scattered .≥ 0)
 
-  scattered = compute_lighting(bsdf, position, normal, lights, camera)
+  pbr = PBR(bsdf, lights)
+  scattered = compute_lighting_from_sources(pbr, position, normal, camera)
   @test all(scattered .≥ 0)
 
   # Notes for comparisons with Blender scenes:
@@ -24,11 +25,11 @@ using ShaderLibrary: scatter_light_sources, compute_lighting
   environment = CubeMap(equirectangular, device)
   irradiance = compute_irradiance(environment, device)
 
-  shader = Environment(device, irradiance)
+  shader = Environment(irradiance, device)
   screen = screen_box(color)
   directions = face_directions(CubeMap)[1]
   geometry = Primitive(Rectangle(screen, directions, nothing))
   render(device, shader, parameters, geometry)
   data = collect(color, device)
-  save_test_render("irradiance_nx.png", data, 0x79fb943ffff5eb4b)
+  save_test_render("irradiance_nx.png", data, 0xe60d0e8e44988431)
 end;

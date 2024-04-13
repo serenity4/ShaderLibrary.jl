@@ -8,7 +8,7 @@ struct GaussianBlurDirectional <: GraphicsShaderComponent
 end
 GaussianBlurDirectional(image::Resource, direction, size = 0.01) = GaussianBlurDirectional(default_texture(image), direction, size)
 
-gaussian_1d(t, size) = exp(-t^2 / 2size^2) / sqrt(2 * (π)F * size^2)
+gaussian_1d(t, size) = exp(-t^2 / 2size^2) / sqrt(2 * πF * size^2)
 
 function gaussian_blur_directional(reference, uv, direction, size)
   res = zero(Vec3)
@@ -52,7 +52,7 @@ function Program(::Type{GaussianBlurDirectional}, device)
   Program(vert, frag)
 end
 
-user_data(blur::GaussianBlurDirectional, ctx) = (blur.direction, blur.size, DescriptorIndex(texture_descriptor(blur.texture), ctx))
+user_data(blur::GaussianBlurDirectional, ctx) = (blur.direction, blur.size, instantiate(blur.texture, ctx))
 resource_dependencies(blur::GaussianBlurDirectional) = @resource_dependencies begin
   @read blur.texture.image::Texture
 end

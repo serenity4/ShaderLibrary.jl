@@ -20,6 +20,7 @@ Base.eltype(::Type{PhysicalBuffer{T}}) where {T} = T
 Base.length(buffer::PhysicalBuffer) = buffer.size
 
 PhysicalBuffer{T}(size::Integer, buffer::Buffer) where {T} = PhysicalBuffer{T}(size, DeviceAddress(buffer))
+PhysicalBuffer{T}() where {T} = PhysicalBuffer{T}(0, DeviceAddress(0))
 
 @struct_hash_equal struct InvocationData
   vertex_locations::PhysicalBuffer{Vec3} # indexed by `VertexIndex + 1`
@@ -83,6 +84,42 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
     ar = aspect_ratio(reference_attachment(parameters))
     @block InvocationData(vlocs, vnorms, vdata, pdata, pinds, idata, udata, parameters.camera, ar)
   end
+end
+
+vector_data(T) = Union{<:Vector{<:T}, <:PhysicalBuffer{<:T}}
+vector_data(T1, T2) = Union{<:Vector{<:T1}, <:PhysicalBuffer{<:T2}}
+
+"""
+    instantiate(data, ctx)
+    instantiate(T, data, ctx)
+
+Transform data in a way that is compatible with shaders.
+
+Here are notable transformations:
+- `Vector{T}` -> `PhysicalBuffer{T}`
+- `Vector{T1}` -> `PhysicalBuffer{T2}` (if `T2` is provided as first argument to `instantiate`)
+- `Texture` -> `DescriptorIndex`
+
+This function may be extended as `instantiate(data::T1, ctx::InvocationDataContext) -> T2` to perform an instantiation from `T1` into `T2`; then, `instantiate(T2, data::Vector{T1}, ctx)` will generate an appropriate `PhysicalBuffer{T2}`
+"""
+function instantiate end
+
+instantiate(data::Texture, ctx::InvocationDataContext) = DescriptorIndex(data, ctx)
+instantiate(data::PhysicalBuffer, ctx::InvocationDataContext) = data
+instantiate(data::AbstractVector{T}, ctx::InvocationDataContext) where {T} = instantiate(T, data, ctx)
+function instantiate(::Type{T}, data::AbstractVector, ctx::InvocationDataContext) where {T}
+  T === eltype(data) && return instantiate(collect(data), ctx)
+  isempty(data) && return PhysicalBuffer{T}()
+  result = T[]
+  for x in data
+    push!(result, instantiate(T, x, ctx))
+  end
+  instantiate(result, ctx)
+end
+function instantiate(::Type{T}, data::AbstractVector{T}, ctx::InvocationDataContext) where {T}
+  block = DataBlock(data, ctx)
+  address = DeviceAddress(block, ctx)
+  PhysicalBuffer{eltype(data)}(length(data), address)
 end
 
 """

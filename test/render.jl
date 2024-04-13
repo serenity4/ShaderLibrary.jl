@@ -114,7 +114,7 @@
     @testset "CubeMap creation & sampling" begin
       images = [read_png(asset("cubemap", face)) for face in ("px.png", "nx.png", "py.png", "ny.png", "pz.png", "nz.png")]
       cubemap = CubeMap(images)
-      shader = Environment(device, cubemap)
+      shader = Environment(cubemap, device)
       @test isa(shader, Environment)
 
       hs = [0xd1a6f182e503cd7a, 0xa2491a5a7110082b, 0xcbfd32a0a2878353, 0x4ca916f836758feb, 0x4003c906192c6c9c, 0xaec665db4e257198]
@@ -135,7 +135,7 @@
 
     @testset "Equirectangular map sampling and conversion to CubeMap" begin
       equirectangular = EquirectangularMap(read_jpeg(asset("equirectangular.jpeg")))
-      shader = Environment(device, equirectangular)
+      shader = Environment(equirectangular, device)
 
       uv = spherical_uv_mapping(Vec3(1, 0, 0))
       @test uv == Vec2(0.5, 0.5)
@@ -168,7 +168,7 @@
       end
 
       cubemap = CubeMap(equirectangular, device)
-      shader = Environment(device, cubemap)
+      shader = Environment(cubemap, device)
       for (name, h) in zip(fieldnames(CubeMap), hs)
         val = getproperty(cubemap, name)
         save_test_render("equirectangular_to_cubemap_$name.png", val, h; keep = false)
@@ -217,7 +217,7 @@
     cube_parameters = setproperties(parameters, (; camera))
     render(device, grad, cube_parameters, primitive)
     data = collect(color, device)
-    save_test_render("colored_cube_perspective.png", data, 0x77a9bdce8be2870b)
+    save_test_render("colored_cube_perspective.png", data, 0xdf4945fb4cbae293)
     @reset camera.focal_length = 0
     @reset camera.near_clipping_plane = -10
     @reset camera.far_clipping_plane = 10
@@ -231,8 +231,7 @@
   @testset "PBR" begin
     bsdf = BSDF{Float32}((1.0, 1.0, 1.0), 0.0, 0.1, 0.5)
     lights = [Light{Float32}(LIGHT_TYPE_POINT, (2.0, 1.0, 1.0), (1.0, 1.0, 1.0), 1.0)]
-    lights_buffer = Buffer(device; data = lights)
-    pbr = PBR(bsdf, PhysicalBuffer{Light{Float32}}(length(lights), lights_buffer))
+    pbr = PBR(bsdf, lights)
     prog = Program(typeof(pbr), device)
     @test isa(prog, Program)
 
@@ -249,14 +248,13 @@
     gltf = read_gltf("blob.gltf")
     bsdf = BSDF{Float32}((1.0, 0.0, 0.0), 0, 0.5, 0.02)
     lights = import_lights(gltf)
-    lights_buffer = Buffer(device; data = lights)
-    pbr = PBR(bsdf, PhysicalBuffer{Light{Float32}}(length(lights), lights_buffer))
+    pbr = PBR(bsdf, lights)
     camera = import_camera(gltf)
     mesh = import_mesh(gltf)
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = import_transform(gltf.nodes[end]; apply_rotation = false))
     cube_parameters = setproperties(parameters; camera)
     render(device, pbr, cube_parameters, primitive)
     data = collect(color, device)
-    save_test_render("shaded_blob_pbr.png", data, 0x521c1f33e76c8ccd)
+    save_test_render("shaded_blob_pbr.png", data, 0x0a88cecb62247e2d)
   end
 end;
