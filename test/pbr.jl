@@ -64,5 +64,5 @@
   pbr = PBR(bsdf, lights, [probe])
   render(device, pbr, pbr_parameters, primitive)
   data = collect(color, device)
-  save_test_render("shaded_blob_pbr_ibl.png", data, 0x0a88cecb62247e2d)
+  save_test_render("shaded_blob_pbr_ibl.png", data, 0xe676416ab03953ec)
 end;

@@ -168,6 +168,15 @@ function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{Invo
 end
 user_data(pbr::PBR{<:Any,P}, ctx::InvocationDataContext) where {P} = PBR(pbr.bsdf, instantiate(pbr.lights, ctx), instantiate(LightProbe{P,DescriptorIndex}, pbr.probes, ctx))
 interface(::PBR) = Tuple{Nothing, Nothing, Nothing}
+function resource_dependencies(pbr::PBR)
+  # XXX: Don't use Lava internals like that.
+  deps = Lava.Dictionary{Resource,ResourceDependency}()
+  for probe in pbr.probes
+    Lava.set!(deps, probe.irradiance.image, Lava.ResourceDependency(Lava.ResourceUsageType(Lava.RESOURCE_USAGE_TEXTURE), Lava.MemoryAccess(Lava.READ), nothing, nothing))
+    Lava.set!(deps, probe.prefiltered_environment.image, Lava.ResourceDependency(Lava.ResourceUsageType(Lava.RESOURCE_USAGE_TEXTURE), Lava.MemoryAccess(Lava.READ), nothing, nothing))
+  end
+  deps
+end
 
 function Program(::Type{<:PBR{T,P}}, device) where {T,P}
   vert = @vertex device pbr_vert(::Vec4::Output{Position}, ::Vec3::Output, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
