@@ -29,6 +29,7 @@ include("shader.jl")
 include("invocation.jl")
 include("lights.jl")
 include("environment.jl")
+include("ibl.jl")
 
 include("library/gradient.jl")
 include("library/rectangle.jl")
@@ -82,7 +83,9 @@ export
   Environment,
 
   # Graphics shader components
-  GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL, GaussianBlur, IrradianceConvolution, compute_irradiance,
+  GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL, GaussianBlur,
+  IrradianceConvolution, compute_irradiance,
+  PrefilteredEnvironmentConvolution, compute_prefiltered_environment,
 
   # Compute shader components
   GammaCorrection,

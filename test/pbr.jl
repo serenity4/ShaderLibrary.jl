@@ -19,18 +19,6 @@
   # - GLTF XYZ <=> Blender XZ(-Y)
   # - Blender XYZ <=> GLTF X(-Z)Y
 
-  equirectangular = EquirectangularMap(read_jpeg(asset("equirectangular.jpeg")))
-  environment = CubeMap(equirectangular, device)
-  irradiance = compute_irradiance(environment, device)
-
-  shader = Environment(irradiance, device)
-  screen = screen_box(color)
-  directions = face_directions(CubeMap)[1]
-  geometry = Primitive(Rectangle(screen, directions, nothing))
-  render(device, shader, parameters, geometry)
-  data = collect(color, device)
-  save_test_render("irradiance_nx.png", data, 0x19d4950653f3984c)
-
   bsdf = BSDF{Float32}((1.0, 1.0, 1.0), 0.0, 0.1, 0.5)
   lights = [Light{Float32}(LIGHT_TYPE_POINT, (2.0, 1.0, 1.0), (1.0, 1.0, 1.0), 1.0)]
   pbr = PBR(bsdf, lights)
@@ -62,16 +50,48 @@
     render(device, pbr, pbr_parameters, primitive)
     data = collect(color, device)
     save_test_render("shaded_blob_pbr.png", data, 0x7971a675275af2c8)
+  end
 
-    probe = LightProbe(irradiance, irradiance, device)
-    pbr = PBR(bsdf, Light{Float32}[], [probe])
-    env = Environment(environment, device)
-    depth = attachment_resource(Vk.FORMAT_D32_SFLOAT, dimensions(color))
-    env_parameters = setproperties(parameters, (; depth, depth_clear = ClearValue(1f0)))
-    pbr_parameters = setproperties(parameters, (; camera, depth, color_clear = [nothing]))
-    nodes = RenderNode[renderables(env, env_parameters, device, Primitive(Rectangle(color; camera.transform))), renderables(pbr, pbr_parameters, device, primitive)]
-    render(device, nodes)
+  @testset "Image-based lighting" begin
+    equirectangular = EquirectangularMap(read_jpeg(asset("equirectangular.jpeg")))
+    environment = CubeMap(equirectangular, device)
+    screen = screen_box(color)
+
+    irradiance = compute_irradiance(environment, device)
+    shader = Environment(irradiance, device)
+    directions = face_directions(CubeMap)[1]
+    geometry = Primitive(Rectangle(screen, directions, nothing))
+    render(device, shader, parameters, geometry)
     data = collect(color, device)
-    save_test_render("shaded_blob_pbr_ibl.png", data)
+    save_test_render("irradiance_nx.png", data, 0x19d4950653f3984c)
+
+    prefiltered_environment = compute_prefiltered_environment(environment, device)
+    shader = Environment(prefiltered_environment, device)
+    directions = face_directions(CubeMap)[5]
+    geometry = Primitive(Rectangle(screen, directions, nothing))
+    render(device, shader, parameters, geometry)
+    data = collect(color, device)
+    save_test_render("prefiltered_pz.png", data, 0x0874791e4fff4da5)
+
+    @testset "Shading" begin
+      gltf = read_gltf("blob.gltf")
+      bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 0, 0.5, 0.02)
+      camera = import_camera(gltf)
+      mesh = import_mesh(gltf)
+      primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = import_transform(gltf.nodes[end]; apply_rotation = false))
+
+      probe = LightProbe(irradiance, prefiltered_environment, device)
+      pbr = PBR(bsdf, Light{Float32}[], [probe])
+      env = Environment(environment, device)
+      depth = attachment_resource(Vk.FORMAT_D32_SFLOAT, dimensions(color))
+      env_parameters = setproperties(parameters, (; depth, depth_clear = ClearValue(1f0)))
+      pbr_parameters = setproperties(parameters, (; camera, depth, color_clear = [nothing]))
+      background = renderables(env, env_parameters, device, Primitive(Rectangle(color; camera.transform)))
+      blob = renderables(pbr, pbr_parameters, device, primitive)
+      nodes = RenderNode[background, blob]
+      render(device, nodes)
+      data = collect(color, device)
+      save_test_render("shaded_blob_pbr_ibl.png", data)
+    end
   end
 end;
