@@ -49,8 +49,9 @@ function resource_dependencies(shader::GraphicsShaderComponent, parameters::Shad
   for (attachment, clear) in zip(color, color_clear)
     insert!(dependencies, attachment, ResourceDependency(RESOURCE_USAGE_COLOR_ATTACHMENT, WRITE, clear, nothing))
   end
-  !isnothing(depth) && insert!(dependencies, depth, ResourceDependency(RESOURCE_USAGE_DEPTH_ATTACHMENT, READ | WRITE, depth_clear, nothing))
-  !isnothing(stencil) && insert!(dependencies, stencil, ResourceDependency(RESOURCE_USAGE_STENCIL_ATTACHMENT, READ, stencil_clear, nothing))
+  samples = !isempty(color) ? Lava.samples(color[1]) : nothing
+  !isnothing(depth) && insert!(dependencies, depth, ResourceDependency(RESOURCE_USAGE_DEPTH_ATTACHMENT, READ | WRITE, depth_clear, samples))
+  !isnothing(stencil) && insert!(dependencies, stencil, ResourceDependency(RESOURCE_USAGE_STENCIL_ATTACHMENT, READ, stencil_clear, samples))
   dependencies
 end
 

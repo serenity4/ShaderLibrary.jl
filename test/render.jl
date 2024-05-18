@@ -125,9 +125,7 @@
         save_test_render("environment_$name.png", data, h)
       end
 
-      wide_screen = screen_box(color)
-      directions = [Point3f(p..., -1F) for p in PointSet(wide_screen)]
-      geometry = Primitive(Rectangle(wide_screen, directions, nothing))
+      geometry = Primitive(Rectangle(color))
       render(device, shader, parameters, geometry)
       data = collect(color, device)
       save_test_render("environment_zp_wide.png", data, 0x46289a67db54dec4)

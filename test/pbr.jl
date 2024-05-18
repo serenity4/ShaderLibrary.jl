@@ -29,7 +29,7 @@
   geometry = Primitive(Rectangle(screen, directions, nothing))
   render(device, shader, parameters, geometry)
   data = collect(color, device)
-  save_test_render("irradiance_nx.png", data, 0xe60d0e8e44988431)
+  save_test_render("irradiance_nx.png", data, 0x19d4950653f3984c)
 
   bsdf = BSDF{Float32}((1.0, 1.0, 1.0), 0.0, 0.1, 0.5)
   lights = [Light{Float32}(LIGHT_TYPE_POINT, (2.0, 1.0, 1.0), (1.0, 1.0, 1.0), 1.0)]
@@ -37,32 +37,41 @@
   prog = Program(typeof(pbr), device)
   @test isa(prog, Program)
 
-  gltf = read_gltf("cube.gltf")
-  mesh = import_mesh(gltf)
-  primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(RotationPlane(1.0, 0.0, 1.0), 0.3π)))
-  camera = import_camera(gltf)
-  pbr_parameters = setproperties(parameters, (; camera))
+  @testset "Shaded cube" begin
+    gltf = read_gltf("cube.gltf")
+    mesh = import_mesh(gltf)
+    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(RotationPlane(1.0, 0.0, 1.0), 0.3π)))
+    camera = import_camera(gltf)
+    pbr_parameters = setproperties(parameters, (; camera))
 
-  render(device, pbr, pbr_parameters, primitive)
-  data = collect(color, device)
-  save_test_render("shaded_cube_pbr.png", data, 0x18e6e9146b6d3548)
+    render(device, pbr, pbr_parameters, primitive)
+    data = collect(color, device)
+    save_test_render("shaded_cube_pbr.png", data, 0x18e6e9146b6d3548)
+  end
 
-  gltf = read_gltf("blob.gltf")
-  bsdf = BSDF{Float32}((1.0, 0.0, 0.0), 0, 0.5, 0.02)
-  camera = import_camera(gltf)
-  mesh = import_mesh(gltf)
-  primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = import_transform(gltf.nodes[end]; apply_rotation = false))
-  pbr_parameters = setproperties(parameters; camera)
+  @testset "Shaded blob" begin
+    gltf = read_gltf("blob.gltf")
+    bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 0, 0.5, 0.02)
+    camera = import_camera(gltf)
+    mesh = import_mesh(gltf)
+    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = import_transform(gltf.nodes[end]; apply_rotation = false))
+    pbr_parameters = setproperties(parameters; camera)
 
-  lights = import_lights(gltf)
-  pbr = PBR(bsdf, lights)
-  render(device, pbr, pbr_parameters, primitive)
-  data = collect(color, device)
-  save_test_render("shaded_blob_pbr.png", data, 0x0a88cecb62247e2d)
+    lights = import_lights(gltf)
+    pbr = PBR(bsdf, lights)
+    render(device, pbr, pbr_parameters, primitive)
+    data = collect(color, device)
+    save_test_render("shaded_blob_pbr.png", data, 0x7971a675275af2c8)
 
-  probe = LightProbe(irradiance, irradiance, device)
-  pbr = PBR(bsdf, lights, [probe])
-  render(device, pbr, pbr_parameters, primitive)
-  data = collect(color, device)
-  save_test_render("shaded_blob_pbr_ibl.png", data, 0xe676416ab03953ec)
+    probe = LightProbe(irradiance, irradiance, device)
+    pbr = PBR(bsdf, Light{Float32}[], [probe])
+    env = Environment(environment, device)
+    depth = attachment_resource(Vk.FORMAT_D32_SFLOAT, dimensions(color))
+    env_parameters = setproperties(parameters, (; depth, depth_clear = ClearValue(1f0)))
+    pbr_parameters = setproperties(parameters, (; camera, depth, color_clear = [nothing]))
+    nodes = RenderNode[renderables(env, env_parameters, device, Primitive(Rectangle(color; camera.transform))), renderables(pbr, pbr_parameters, device, primitive)]
+    render(device, nodes)
+    data = collect(color, device)
+    save_test_render("shaded_blob_pbr_ibl.png", data)
+  end
 end;

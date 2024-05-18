@@ -161,12 +161,12 @@ end
 
 function face_directions(::Type{<:CubeMap})
   @SVector [
-    Point3f[(1, -1, -1), (1, -1, 1), (1, 1, -1), (1, 1, 1)],
-    Point3f[(-1, -1, 1), (-1, -1, -1), (-1, 1, 1), (-1, 1, -1)],
-    Point3f[(-1, 1, -1), (1, 1, -1), (-1, 1, 1), (1, 1, 1)],
-    Point3f[(-1, -1, 1), (1, -1, 1), (-1, -1, -1), (1, -1, -1)],
-    Point3f[(-1, -1, -1), (1, -1, -1), (-1, 1, -1), (1, 1, -1)],
-    Point3f[(1, -1, 1), (-1, -1, 1), (1, 1, 1), (-1, 1, 1)],
+    Point3f[(1, -1, -1), (1, -1, 1), (1, 1, -1), (1, 1, 1)],     # +X
+    Point3f[(-1, -1, 1), (-1, -1, -1), (-1, 1, 1), (-1, 1, -1)], # -X
+    Point3f[(-1, 1, -1), (1, 1, -1), (-1, 1, 1), (1, 1, 1)],     # +Y
+    Point3f[(-1, -1, 1), (1, -1, 1), (-1, -1, -1), (1, -1, -1)], # -Y
+    Point3f[(-1, -1, -1), (1, -1, -1), (-1, 1, -1), (1, 1, -1)], # +Z
+    Point3f[(1, -1, 1), (-1, -1, 1), (1, 1, 1), (-1, 1, 1)],     # -Z
   ]
 end
 
@@ -244,6 +244,124 @@ function compute_irradiance(::Type{CubeMap{T}}, environment::Resource, device::D
   n = 32
   face_attachments = [attachment_resource(device, zeros(T, n, n); usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT) for _ in 1:6]
   shader = IrradianceConvolution{CubeMap{T}}(environment)
+  screen = screen_box(face_attachments[1])
+  faces = Matrix{T}[]
+  for (face_attachment, directions) in zip(face_attachments, face_directions(CubeMap))
+    geometry = Primitive(Rectangle(screen, directions, nothing))
+    parameters = ShaderParameters(face_attachment)
+    # Improvement: Parallelize face rendering with `render!` and a manually constructed render graph.
+    # There is no need to synchronize sequentially with blocking functions as done here.
+    render(device, shader, parameters, geometry)
+    face = collect(face_attachment, device)
+    push!(faces, face)
+  end
+  CubeMap(faces)
+end
+
+# -------------------------------------------------
+# From https://learnopengl.com/PBR/IBL/Specular-IBL
+
+function radical_inverse_vdc(bits::UInt32)
+  bits = (bits << 16U) | (bits >> 16U)
+  bits = ((bits & 0x55555555) << 1U) | ((bits & 0xAAAAAAAA) >> 1U)
+  bits = ((bits & 0x33333333) << 2U) | ((bits & 0xCCCCCCCC) >> 2U)
+  bits = ((bits & 0x0F0F0F0F) << 4U) | ((bits & 0xF0F0F0F0) >> 4U)
+  bits = ((bits & 0x00FF00FF) << 8U) | ((bits & 0xFF00FF00) >> 8U)
+  float(bits) * 2.3283064365386963f-10 # 0x100000000
+end
+"Generate a low discrepancy sequence using the [Hammersley set](https://en.wikipedia.org/wiki/Low-discrepancy_sequence#Hammersley_set)."
+hammersley(i::UInt32, n) = Vec2(float(i)/float(n), radical_inverse_vdc(i))
+
+"""
+    importance_sampling_ggx((a, b), α)
+    importance_sampling_ggx((a, b), α, Ω::Rotation)
+    importance_sampling_ggx((a, b), α, normal)
+
+Generate a microfacet normal using importance sampling, such that light reflected on it contributes to the lighting.
+
+`a` and `b` are two random numbers between 0 and 1, used to generate a normal vector disturbed on the tangent/bitangent directions.
+`α` is the roughness of the surface, used to predict a sampling shape that is more widely spread for larger roughness values.
+
+If a rotation or normal is provided as a third argument, the result will be converted from tangent space to world space.
+"""
+function importance_sampling_ggx end
+
+function importance_sampling_ggx((a, b), α)
+  # Generate spherical angles from the two random nubmers `a` and `b`.
+  α² = α^2
+  ϕ = 2πF * a
+  sinϕ, cosϕ = sincos(ϕ)
+  cosθ = sqrt((one(b) - b) / (one(b) + (α²^2 - one(b)) * b))
+  sinθ = sqrt(one(cosθ) - cosθ^2)
+
+  # Generate a cartesian vector from spherical angles.
+  Point(sinθ * cosϕ, sinθ * sinϕ, cosθ)
+end
+
+importance_sampling_ggx((a, b), α, Ω::Rotation) = apply_rotation(importance_sampling_ggx((a, b), α), Ω)
+importance_sampling_ggx((a, b), α, microfacet_normal) = importance_sampling_ggx((a, b), α, Rotation(Point3f(0, 0, 1), point3(microfacet_normal)))
+
+# -------------------------------------------------
+
+function prefiltered_environment_convolution_vert(position, center, index, (; data)::PhysicalRef{InvocationData})
+  position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1], data)
+  position.z = 1
+  center[] = @load data.vertex_data[index + 1]::Vec3
+end
+
+function prefiltered_environment_convolution_frag(::Type{<:CubeMap}, prefiltered_color, center, (; data)::PhysicalRef{InvocationData}, textures)
+  (texture_index, roughness) = @load data.user_data::DescriptorIndex
+  environment_map = textures[texture_index]
+  NUMBER_OF_SAMPLES = 1024U
+  value = zero(Vec3)
+  total_weight = 0F
+  surface_normal = normalize(center)
+  for i in 1U:NUMBER_OF_SAMPLES
+    (a, b) = hammersley(i, NUMBER_OF_SAMPLES)
+    microfacet_normal = importance_sampling_ggx((a, b), roughness, surface_normal)
+    light_direction = normalize(2F * shape_factor(microfacet_normal, normal) * (microfacet_normal - center))
+    sₗ = shape_factor(center, light_direction)
+    if sₗ > zero(sₗ)
+      value += environment_map(light_direction).rgb * sₗ
+      total_weight += sₗ
+    end
+  end
+  prefiltered_color.rgb = value ./ total_weight
+  prefiltered_color.a = 1F
+end
+
+struct PrefilteredEnvironmentConvolution{C<:CubeMap} <: GraphicsShaderComponent
+  roughness::Float32
+  texture::Texture
+end
+
+PrefilteredEnvironmentConvolution{C}(resource::Resource) where {C<:CubeMap} = PrefilteredEnvironmentConvolution{C}(default_texture(resource; address_modes = CLAMP_TO_EDGE))
+PrefilteredEnvironmentConvolution(environment::CubeMap, device) = PrefilteredEnvironmentConvolution{typeof(environment)}(Resource(environment, device))
+
+interface(shader::PrefilteredEnvironmentConvolution) = Tuple{Vector{Point3f},Nothing,Nothing}
+user_data(shader::PrefilteredEnvironmentConvolution, ctx) = (instantiate(shader.texture, ctx), shader.roughness)
+resource_dependencies(shader::PrefilteredEnvironmentConvolution) = @resource_dependencies begin
+  @read shader.texture.image::Texture
+end
+
+function Program(::Type{PrefilteredEnvironmentConvolution{C}}, device) where {C}
+  vert = @vertex device prefiltered_environment_convolution_vert(::Vec4::Output{Position}, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+  frag = @fragment device prefiltered_environment_convolution_frag(
+    ::Type{C},
+    ::Vec4::Output,
+    ::Vec3::Input,
+    ::PhysicalRef{InvocationData}::PushConstant,
+    ::Arr{2048,SPIRV.SampledImage{SPIRV.image_type(C)}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
+  Program(vert, frag)
+end
+
+compute_prefiltered_environment(environment::CubeMap{T}, device::Device) where {T} = compute_prefiltered_environment(CubeMap{T}, Resource(environment, device), device)
+
+function compute_prefiltered_environment(::Type{CubeMap{T}}, environment::Resource, device::Device) where {T}
+  # XXX: Compute all mip levels, not just one, i.e. we should end up with 5 or 6 cubemaps.
+  n = 256
+  face_attachments = [attachment_resource(device, zeros(T, n, n); usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT) for _ in 1:6]
+  shader = PrefilteredEnvironmentConvolution{CubeMap{T}}(environment)
   screen = screen_box(face_attachments[1])
   faces = Matrix{T}[]
   for (face_attachment, directions) in zip(face_attachments, face_directions(CubeMap))

@@ -15,3 +15,9 @@ function Primitive(rect::Rectangle, transform::Transform = Transform())
   mesh = VertexMesh(1:4, PointSet(rect.geometry); rect.vertex_data)
   Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform, data = rect.primitive_data)
 end
+
+function Rectangle(color::Resource, primitive_data = nothing; transform::Transform = Transform())
+  screen = screen_box(aspect_ratio(color))
+  directions = [apply_rotation(Point3f(p..., -1F), transform.rotation) for p in PointSet(screen)]
+  Rectangle(screen, directions, primitive_data)
+end
