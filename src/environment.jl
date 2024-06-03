@@ -15,11 +15,12 @@ Base.show(io::IO, cubemap::CubeMap) = print(io, CubeMap, " with 6x$(join(size(cu
 
 check_number_of_images(images) = length(images) == 6 || throw(ArgumentError("Expected 6 face images for CubeMap, got $(length(images)) instead"))
 
-function CubeMap(images::AbstractVector{Matrix{T}}) where {T}
+function CubeMap{T}(images::AbstractVector{Matrix{T}}) where {T}
   check_number_of_images(images)
   allequal(size(image) for image in images) || throw(ArgumentError("Expected all face images to have the same size, obtained multiple sizes $(unique(size.(images)))"))
-  CubeMap(images...)
+  CubeMap{T}(images[1], images[2], images[3], images[4], images[5], images[6])
 end
+CubeMap(images::AbstractVector{Matrix{T}}) where {T} = CubeMap{T}(images)
 
 function CubeMap(images::AbstractVector{T}) where {T<:Matrix}
   check_number_of_images(images)
@@ -53,11 +54,13 @@ end
 Environment(cubemap::CubeMap, device::Device) = Environment{typeof(cubemap)}(Resource(cubemap, device))
 Environment(equirectangular::EquirectangularMap, device::Device) = Environment{typeof(equirectangular)}(Resource(equirectangular, device))
 
-function Environment{C}(resource::Resource) where {C<:EnvironmentMap}
+function Environment{E}(resource::Resource) where {E<:EnvironmentMap}
   # Make sure we don't have any seams.
   texture = default_texture(resource; address_modes = CLAMP_TO_EDGE)
-  Environment{C}(texture)
+  Environment{E}(texture)
 end
+
+Accessors.constructorof(::Type{Environment{E}}) where {E<:EnvironmentMap} = Environment{E}
 
 interface(env::Environment) = Tuple{Vector{Point3f},Nothing,Nothing}
 user_data(env::Environment, ctx) = instantiate(env.texture, ctx)
@@ -171,3 +174,14 @@ function face_directions(::Type{<:CubeMap})
 end
 
 Environment{C}(device::Device, image::EquirectangularMap) where {C<:CubeMap} = Environment(C(device, image, device))
+
+CubeMap(resource::Resource, device::Device) = CubeMap(resource.image, device)
+CubeMap{T}(resource::Resource, device::Device) where {T} = CubeMap{T}(resource.image, device)
+CubeMap(image::Image, device::Device) = CubeMap{Lava.format_type(image.format)}(image, device)
+function CubeMap{T}(image::Image, device::Device) where {T}
+  images = Matrix{T}[]
+  for face in 1:6
+    push!(images, collect(T, image, device; layer = face))
+  end
+  CubeMap{T}(images)
+end

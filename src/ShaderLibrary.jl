@@ -2,7 +2,7 @@ module ShaderLibrary
 
 using Random: Random, MersenneTwister, AbstractRNG
 using StaticArrays
-using Accessors: @set, @reset, setproperties
+using Accessors: Accessors, @set, @reset, setproperties
 using ColorTypes
 using SPIRV: SPIRV, validate, U, F, image_type
 using SPIRV.MathFunctions

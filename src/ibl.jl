@@ -200,18 +200,16 @@ compute_prefiltered_environment(environment::CubeMap{T}, device::Device) where {
 function compute_prefiltered_environment(::Type{CubeMap{T}}, environment::Resource, device::Device) where {T}
   # TODO: Compute all mip levels, not just one, i.e. we should end up with 5 or 6 mip levels.
   n = 256
-  face_attachments = [attachment_resource(device, zeros(T, n, n); usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT) for _ in 1:6]
+  resource = image_resource(device, nothing; dims = [n, n], layers = 6, format = T, usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
   shader = PrefilteredEnvironmentConvolution{CubeMap{T}}(environment, 0.1)
-  screen = screen_box(face_attachments[1])
-  faces = Matrix{T}[]
-  for (face_attachment, directions) in zip(face_attachments, face_directions(CubeMap))
+  screen = screen_box(1.0)
+  for (i, directions) in enumerate(face_directions(CubeMap))
     geometry = Primitive(Rectangle(screen, directions, nothing))
-    parameters = ShaderParameters(face_attachment)
+    attachment = attachment_resource(ImageView(resource.image; layer_range = i:i), WRITE; name = Symbol(:prefiltered_environment_, fieldnames(CubeMap{T})[i]))
+    parameters = ShaderParameters(attachment)
     # Improvement: Parallelize face rendering with `render!` and a manually constructed render graph.
     # There is no need to synchronize sequentially with blocking functions as done here.
     render(device, shader, parameters, geometry)
-    face = collect(face_attachment, device)
-    push!(faces, face)
   end
-  CubeMap(faces)
+  CubeMap{T}(resource, device)
 end
