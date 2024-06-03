@@ -30,7 +30,7 @@ end
 function Lava.Resource(cubemap::CubeMap, device::Device)
   (; xp, xn, yp, yn, zp, zn) = cubemap
   data = [xp, xn, yp, yn, zp, zn]
-  image_resource(device, data; name = :environment_cubemap, array_layers = 6)
+  image_resource(device, data; name = :environment_cubemap, layers = 6)
 end
 
 function Lava.Texture(cubemap::CubeMap, device::Device)
