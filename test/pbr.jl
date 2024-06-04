@@ -54,10 +54,10 @@
 
   @testset "Image-based lighting" begin
     equirectangular = EquirectangularMap(read_jpeg(asset("equirectangular.jpeg")))
-    environment = CubeMap(equirectangular, device)
+    environment = Resource(CubeMap(equirectangular, device), device)
     screen = screen_box(color)
 
-    irradiance = compute_irradiance(environment, device)
+    irradiance = compute_irradiance(CubeMap{eltype(equirectangular.data)}, environment, device)
     shader = Environment(irradiance, device)
     directions = face_directions(CubeMap)[1]
     geometry = Primitive(Rectangle(screen, directions, nothing))
@@ -65,13 +65,22 @@
     data = collect(color, device)
     save_test_render("irradiance_nx.png", data, 0x19d4950653f3984c)
 
-    prefiltered_environment = compute_prefiltered_environment(environment, device)
-    shader = Environment(prefiltered_environment, device)
+    prefiltered_environment = compute_prefiltered_environment(environment, device; mip_levels = 1)
+    shader = Environment{CubeMap{eltype(equirectangular.data)}}(prefiltered_environment)
     directions = face_directions(CubeMap)[5]
     geometry = Primitive(Rectangle(screen, directions, nothing))
     render(device, shader, parameters, geometry)
     data = collect(color, device)
-    save_test_render("prefiltered_pz.png", data, 0x0874791e4fff4da5)
+    save_test_render("prefiltered_pz_mip1.png", data, 0x5339e496001f9c5e)
+
+    prefiltered_environment = compute_prefiltered_environment(environment, device; base_resolution = 1024)
+    @test prefiltered_environment.image.mip_levels > 4
+    data = collect(ImageView(prefiltered_environment.image; layer_range = 5:5, mip_range = 2:2), device)
+    @test size(data) == (512, 512)
+    save_test_render("prefiltered_pz_mip2.png", data, 0xe8daaff23227c4d5)
+    data = collect(ImageView(prefiltered_environment.image; layer_range = 5:5, mip_range = 4:4), device)
+    @test size(data) == (128, 128)
+    save_test_render("prefiltered_pz_mip4.png", data, 0x0cb2e537faab6792)
 
     @testset "Shading" begin
       gltf = read_gltf("blob.gltf")

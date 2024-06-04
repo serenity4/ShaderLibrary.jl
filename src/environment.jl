@@ -28,6 +28,17 @@ function CubeMap(images::AbstractVector{T}) where {T<:Matrix}
   CubeMap(@SVector [xp, xn, yp, yn, zp, zn])
 end
 
+CubeMap(resource::Resource, device::Device) = CubeMap(resource.image, device)
+CubeMap{T}(resource::Resource, device::Device) where {T} = CubeMap{T}(resource.image, device)
+CubeMap(image::Image, device::Device) = CubeMap{Lava.format_type(image.format)}(image, device)
+function CubeMap{T}(image::Image, device::Device) where {T}
+  images = Matrix{T}[]
+  for face in 1:6
+    push!(images, collect(T, image, device; layer = face))
+  end
+  CubeMap{T}(images)
+end
+
 function Lava.Resource(cubemap::CubeMap, device::Device)
   (; xp, xn, yp, yn, zp, zn) = cubemap
   data = [xp, xn, yp, yn, zp, zn]
@@ -174,14 +185,3 @@ function face_directions(::Type{<:CubeMap})
 end
 
 Environment{C}(device::Device, image::EquirectangularMap) where {C<:CubeMap} = Environment(C(device, image, device))
-
-CubeMap(resource::Resource, device::Device) = CubeMap(resource.image, device)
-CubeMap{T}(resource::Resource, device::Device) where {T} = CubeMap{T}(resource.image, device)
-CubeMap(image::Image, device::Device) = CubeMap{Lava.format_type(image.format)}(image, device)
-function CubeMap{T}(image::Image, device::Device) where {T}
-  images = Matrix{T}[]
-  for face in 1:6
-    push!(images, collect(T, image, device; layer = face))
-  end
-  CubeMap{T}(images)
-end
