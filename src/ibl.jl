@@ -3,12 +3,12 @@
 # - The irradiance map, used for diffuse lighting (a single low-resolution cubemap).
 # - The prefiltered envrionment map, used for specular lighting (a high-resolution cubemap where increasing mip levels are correlated to decreasing roughness).
 
-struct IrradianceConvolution{C<:CubeMap} <: GraphicsShaderComponent
+struct IrradianceConvolution{F} <: GraphicsShaderComponent
   texture::Texture
 end
 
-IrradianceConvolution{C}(resource::Resource) where {C<:CubeMap} = IrradianceConvolution{C}(default_texture(resource; address_modes = CLAMP_TO_EDGE))
-IrradianceConvolution(environment::CubeMap, device) = IrradianceConvolution{typeof(environment)}(Resource(environment, device))
+IrradianceConvolution{F}(resource::Resource) where {F} = IrradianceConvolution{F}(environment_texture_cubemap(resource))
+IrradianceConvolution(resource::Resource) = IrradianceConvolution{resource.image.format}(resource)
 
 interface(shader::IrradianceConvolution) = Tuple{Vector{Point3f},Nothing,Nothing}
 user_data(shader::IrradianceConvolution, ctx) = instantiate(shader.texture, ctx)
@@ -45,7 +45,7 @@ function irradiance_convolution_vert(position, location, index, (; data)::Physic
   location[] = @load data.vertex_data[index + 1]::Vec3
 end
 
-function irradiance_convolution_frag(::Type{<:CubeMap}, irradiance, location, (; data)::PhysicalRef{InvocationData}, textures)
+function irradiance_convolution_frag(irradiance, location, (; data)::PhysicalRef{InvocationData}, textures)
   texture_index = @load data.user_data::DescriptorIndex
   texture = textures[texture_index]
   dθ = 0.025F
@@ -57,45 +57,42 @@ function irradiance_convolution_frag(::Type{<:CubeMap}, irradiance, location, (;
   irradiance.a = 1F
 end
 
-function Program(::Type{IrradianceConvolution{C}}, device) where {C}
+function Program(::Type{IrradianceConvolution{F}}, device) where {F}
   vert = @vertex device irradiance_convolution_vert(::Vec4::Output{Position}, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device irradiance_convolution_frag(
-    ::Type{C},
     ::Vec4::Output,
     ::Vec3::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
-    ::Arr{2048,SPIRV.SampledImage{SPIRV.image_type(C)}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
+    ::Arr{2048,SPIRV.SampledImage{spirv_image_type(F, Val(:cubemap))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
   Program(vert, frag)
 end
 
-compute_irradiance(environment::CubeMap{T}, device::Device) where {T} = compute_irradiance(CubeMap{T}, Resource(environment, device), device)
-
-function compute_irradiance(::Type{CubeMap{T}}, environment::Resource, device::Device) where {T}
+function compute_irradiance(environment::Resource, device::Device)
   # Use small attachments, as irradiance cubemaps don't have high-frequency details.
   n = 32
-  face_attachments = [attachment_resource(device, zeros(T, n, n); usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT) for _ in 1:6]
-  shader = IrradianceConvolution{CubeMap{T}}(environment)
-  screen = screen_box(face_attachments[1])
-  faces = Matrix{T}[]
-  for (face_attachment, directions) in zip(face_attachments, face_directions(CubeMap))
+  usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT | Vk.IMAGE_USAGE_SAMPLED_BIT
+  irradiance = image_resource(device, nothing; environment.image.format, dims = [n, n], layers = 6, usage_flags)
+  shader = IrradianceConvolution{environment.image.format}(environment)
+  screen = screen_box(1.0)
+  for layer in 1:6
+    directions = CUBEMAP_FACE_DIRECTIONS[layer]
     geometry = Primitive(Rectangle(screen, directions, nothing))
-    parameters = ShaderParameters(face_attachment)
+    attachment = attachment_resource(ImageView(irradiance.image; layer_range = layer:layer), WRITE; name = Symbol(:irradiance_layer_, layer))
+    parameters = ShaderParameters(attachment)
     # Improvement: Parallelize face rendering with `render!` and a manually constructed render graph.
     # There is no need to synchronize sequentially with blocking functions as done here.
     render(device, shader, parameters, geometry)
-    face = collect(face_attachment, device)
-    push!(faces, face)
   end
-  CubeMap(faces)
+  irradiance
 end
 
-struct PrefilteredEnvironmentConvolution{C<:CubeMap} <: GraphicsShaderComponent
+struct PrefilteredEnvironmentConvolution{F} <: GraphicsShaderComponent
   texture::Texture
   roughness::Float32
 end
 
-PrefilteredEnvironmentConvolution{C}(resource::Resource, roughness) where {C<:CubeMap} = PrefilteredEnvironmentConvolution{C}(default_texture(resource; address_modes = CLAMP_TO_EDGE), roughness)
-PrefilteredEnvironmentConvolution(environment::CubeMap, device, roughness) = PrefilteredEnvironmentConvolution{typeof(environment)}(Resource(environment, device), roughness)
+PrefilteredEnvironmentConvolution{F}(resource::Resource, roughness) where {F} = PrefilteredEnvironmentConvolution{F}(environment_texture_cubemap(resource), roughness)
+PrefilteredEnvironmentConvolution(resource::Resource, roughness) = PrefilteredEnvironmentConvolution{resource.image.format}(resource, roughness)
 
 interface(shader::PrefilteredEnvironmentConvolution) = Tuple{Vector{Point3f},Nothing,Nothing}
 user_data(shader::PrefilteredEnvironmentConvolution, ctx) = (instantiate(shader.texture, ctx), shader.roughness)
@@ -148,7 +145,7 @@ importance_sampling_ggx((a, b), α, microfacet_normal) = importance_sampling_ggx
 
 # -------------------------------------------------
 
-function prefiltered_environment_convolution_frag(::Type{C}, prefiltered_color, location, (; data)::PhysicalRef{InvocationData}, textures) where {C<:CubeMap}
+function prefiltered_environment_convolution_frag(prefiltered_color, location, (; data)::PhysicalRef{InvocationData}, textures)
   (texture_index, roughness) = @load data.user_data::Tuple{DescriptorIndex,Float32}
   environment_map = textures[texture_index]
   NUMBER_OF_SAMPLES = 1024U
@@ -174,7 +171,7 @@ function prefiltered_environment_convolution_frag(::Type{C}, prefiltered_color, 
 
     sₗ = shape_factor(normal, light_direction)
     if !iszero(sₗ)
-      value += sample_along_direction(C, environment_map, light_direction).rgb * sₗ
+      value += sample_from_cubemap(environment_map, light_direction).rgb * sₗ
       total_weight += sₗ
     end
   end
@@ -184,22 +181,22 @@ end
 
 reflect(vec, axis) = normalize(vec - 2F * (vec ⋅ axis) * axis)
 
-function Program(::Type{PrefilteredEnvironmentConvolution{C}}, device) where {C}
+function Program(::Type{PrefilteredEnvironmentConvolution{F}}, device) where {F}
   vert = @vertex device irradiance_convolution_vert(::Vec4::Output{Position}, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device prefiltered_environment_convolution_frag(
-    ::Type{C},
     ::Vec4::Output,
     ::Vec3::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
-    ::Arr{2048,SPIRV.SampledImage{SPIRV.image_type(C)}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
+    ::Arr{2048,SPIRV.SampledImage{spirv_image_type(F, Val(:cubemap))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
   Program(vert, frag)
 end
 
 function compute_prefiltered_environment!(image::Image, mip_level::Integer, device::Device, shader::PrefilteredEnvironmentConvolution)
   screen = screen_box(1.0)
-  for (i, directions) in enumerate(face_directions(CubeMap))
+  for layer in 1:6
+    directions = CUBEMAP_FACE_DIRECTIONS[layer]
     geometry = Primitive(Rectangle(screen, directions, nothing))
-    attachment = attachment_resource(ImageView(image; layer_range = i:i, mip_range = mip_level:mip_level), WRITE; name = Symbol(:prefiltered_environment_mip_, mip_level, :_layer_, fieldnames(CubeMap)[i]))
+    attachment = attachment_resource(ImageView(image; layer_range = layer:layer, mip_range = mip_level:mip_level), WRITE; name = Symbol(:prefiltered_environment_mip_, mip_level, :_layer_, fieldnames(CubeMapFaces)[layer]))
     parameters = ShaderParameters(attachment)
     # Improvement: Parallelize face rendering with `render!` and a manually constructed render graph.
     # There is no need to synchronize sequentially with blocking functions as done here.
@@ -208,9 +205,10 @@ function compute_prefiltered_environment!(image::Image, mip_level::Integer, devi
 end
 
 function compute_prefiltered_environment!(result::Resource, environment::Resource, device::Device)
+  assert_is_cubemap(result)
   for mip_level in mip_range(result.image)
     roughness = (mip_level - 1) / (max(1, length(mip_range(result.image)) - 1))
-    shader = PrefilteredEnvironmentConvolution{CubeMap{Lava.format_type(environment.image.format)}}(environment, roughness)
+    shader = PrefilteredEnvironmentConvolution{environment.image.format}(environment, roughness)
     compute_prefiltered_environment!(result.image, mip_level, device, shader)
   end
   result

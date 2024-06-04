@@ -53,27 +53,27 @@
   end
 
   @testset "Image-based lighting" begin
-    equirectangular = EquirectangularMap(read_jpeg(asset("equirectangular.jpeg")))
-    environment = Resource(CubeMap(equirectangular, device), device)
+    equirectangular = image_resource(device, read_jpeg(asset("equirectangular.jpeg")); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT)
+    cubemap = create_cubemap_from_equirectangular(device, equirectangular)
     screen = screen_box(color)
 
-    irradiance = compute_irradiance(CubeMap{eltype(equirectangular.data)}, environment, device)
-    shader = Environment(irradiance, device)
-    directions = face_directions(CubeMap)[1]
+    irradiance = compute_irradiance(cubemap, device)
+    shader = environment_from_cubemap(irradiance)
+    directions = CUBEMAP_FACE_DIRECTIONS[1]
     geometry = Primitive(Rectangle(screen, directions, nothing))
     render(device, shader, parameters, geometry)
     data = collect(color, device)
     save_test_render("irradiance_nx.png", data, 0x19d4950653f3984c)
 
-    prefiltered_environment = compute_prefiltered_environment(environment, device; mip_levels = 1)
-    shader = Environment{CubeMap{eltype(equirectangular.data)}}(prefiltered_environment)
-    directions = face_directions(CubeMap)[5]
+    prefiltered_environment = compute_prefiltered_environment(cubemap, device; mip_levels = 1)
+    shader = environment_from_cubemap(prefiltered_environment)
+    directions = CUBEMAP_FACE_DIRECTIONS[5]
     geometry = Primitive(Rectangle(screen, directions, nothing))
     render(device, shader, parameters, geometry)
     data = collect(color, device)
     save_test_render("prefiltered_pz_mip1.png", data, 0x5339e496001f9c5e)
 
-    prefiltered_environment = compute_prefiltered_environment(environment, device; base_resolution = 1024)
+    prefiltered_environment = compute_prefiltered_environment(cubemap, device; base_resolution = 1024)
     @test prefiltered_environment.image.mip_levels > 4
     data = collect(ImageView(prefiltered_environment.image; layer_range = 5:5, mip_range = 2:2), device)
     @test size(data) == (512, 512)
@@ -91,7 +91,7 @@
 
       probe = LightProbe(irradiance, prefiltered_environment, device)
       pbr = PBR(bsdf, Light{Float32}[], [probe])
-      env = Environment(environment, device)
+      env = environment_from_cubemap(cubemap)
       depth = attachment_resource(Vk.FORMAT_D32_SFLOAT, dimensions(color))
       env_parameters = setproperties(parameters, (; depth, depth_clear = ClearValue(1f0)))
       pbr_parameters = setproperties(parameters, (; camera, depth, color_clear = [nothing]))

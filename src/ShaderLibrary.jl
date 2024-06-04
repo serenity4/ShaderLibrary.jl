@@ -1,6 +1,8 @@
 module ShaderLibrary
 
 using Random: Random, MersenneTwister, AbstractRNG
+using StyledStrings: @styled_str
+using Preferences
 using StaticArrays
 using Accessors: Accessors, @set, @reset, setproperties
 using ColorTypes
@@ -23,6 +25,7 @@ const Optional{T} = Union{T, Nothing}
 
 import Lava: RenderTargets, Program, Command, ProgramInvocationData, DrawIndexed, render
 
+include("preferences.jl")
 include("camera.jl")
 include("primitive.jl")
 include("shader.jl")
@@ -79,11 +82,12 @@ export
   LightProbe,
 
   # Environment
-  EnvironmentMap, CubeMap, EquirectangularMap,
-  Environment,
+  create_cubemap, create_cubemap_from_equirectangular,
+  collect_cubemap_faces, CubeMapFaces, CUBEMAP_FACE_DIRECTIONS,
+  Environment, environment_from_cubemap, environment_from_equirectangular,
 
   # Graphics shader components
-  GaussianBlurDirectional, BlurDirection, BLUR_HORIZONTAL, BLUR_VERTICAL, GaussianBlur,
+  GaussianBlurDirectional, BLUR_HORIZONTAL, BLUR_VERTICAL, GaussianBlur,
   IrradianceConvolution, compute_irradiance,
   PrefilteredEnvironmentConvolution, compute_prefiltered_environment,
 

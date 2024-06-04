@@ -121,10 +121,11 @@ struct LightProbe{T,R<:Union{Texture,DescriptorIndex}}
     new{T,R}(irradiance, prefiltered_environment)
   end
 end
-function LightProbe(irradiance::CubeMap{T}, prefiltered_environment::CubeMap{T}, device::Device) where {T}
-  irradiance = Texture(irradiance, device)
-  prefiltered_environment = Texture(prefiltered_environment, device)
-  LightProbe{T}(irradiance, prefiltered_environment)
+function LightProbe(irradiance::Resource, prefiltered_environment::Resource, device::Device)
+  format = irradiance.image.format
+  irradiance = environment_texture_cubemap(irradiance)
+  prefiltered_environment = environment_texture_cubemap(prefiltered_environment)
+  LightProbe{Vk.format_type(format)}(irradiance, prefiltered_environment)
 end
 
 const DEFAULT_LIGHT_PROBE_ELTYPE = RGBA{Float16}
@@ -186,7 +187,7 @@ function Program(::Type{<:PBR{T,P}}, device) where {T,P}
     ::Point3f::Input,
     ::SVector{3,Float32}::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
-    ::Arr{2048,SPIRV.SampledImage{SPIRV.image_type(CubeMap{P})}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)}
+    ::Arr{2048,SPIRV.SampledImage{spirv_image_type(Vk.Format(T), Val(:cubemap))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)}
   )
   Program(vert, frag)
 end

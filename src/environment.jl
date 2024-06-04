@@ -1,6 +1,18 @@
-abstract type EnvironmentMap{T} end
+check_number_of_images(images) = length(images) == 6 || throw(ArgumentError("Expected 6 face images for CubeMap, got $(length(images)) instead"))
 
-struct CubeMap{T} <: EnvironmentMap{T}
+function create_cubemap(device::Device, images::AbstractVector{Matrix{T}}) where {T}
+  check_number_of_images(images)
+  allequal(size(image) for image in images) || throw(ArgumentError("Expected all face images to have the same size, obtained multiple sizes $(unique(size.(images)))"))
+  image_resource(device, images; format = T, name = :cubemap, layers = 6)
+end
+
+function create_cubemap(device::Device, images::AbstractVector{T}) where {T<:Matrix}
+  check_number_of_images(images)
+  xp, xn, yp, yn, zp, zn = promote(ntuple(i -> images[i], 6)...)
+  create_cubemap(@SVector [xp, xn, yp, yn, zp, zn])
+end
+
+struct CubeMapFaces{T}
   xp::Matrix{T}
   xn::Matrix{T}
   yp::Matrix{T}
@@ -9,69 +21,50 @@ struct CubeMap{T} <: EnvironmentMap{T}
   zn::Matrix{T}
 end
 
-Base.eltype(::Type{CubeMap{T}}) where {T} = T
+Base.eltype(::Type{CubeMapFaces{T}}) where {T} = T
+Base.show(io::IO, faces::CubeMapFaces) = print(io, typeof(faces), " with 6x$(join(size(faces.xp), 'x')) ", eltype(typeof(faces)), " texels")
 
-Base.show(io::IO, cubemap::CubeMap) = print(io, CubeMap, " with 6x$(join(size(cubemap.xp), 'x')) ", eltype(typeof(cubemap)), " texels")
-
-check_number_of_images(images) = length(images) == 6 || throw(ArgumentError("Expected 6 face images for CubeMap, got $(length(images)) instead"))
-
-function CubeMap{T}(images::AbstractVector{Matrix{T}}) where {T}
-  check_number_of_images(images)
-  allequal(size(image) for image in images) || throw(ArgumentError("Expected all face images to have the same size, obtained multiple sizes $(unique(size.(images)))"))
-  CubeMap{T}(images[1], images[2], images[3], images[4], images[5], images[6])
-end
-CubeMap(images::AbstractVector{Matrix{T}}) where {T} = CubeMap{T}(images)
-
-function CubeMap(images::AbstractVector{T}) where {T<:Matrix}
-  check_number_of_images(images)
-  xp, xn, yp, yn, zp, zn = promote(ntuple(i -> images[i], 6)...)
-  CubeMap(@SVector [xp, xn, yp, yn, zp, zn])
+function assert_is_cubemap(resource::Resource)
+  @assertion
+  assert_type(resource, RESOURCE_TYPE_IMAGE)
+  allequal(dimensions(resource.image)) || error("Cubemaps require width and height to be the same")
+  resource.image.layers == 6 || error("Expected 6 image layers, found ", resource.image.layers, "instead")
 end
 
-CubeMap(resource::Resource, device::Device) = CubeMap(resource.image, device)
-CubeMap{T}(resource::Resource, device::Device) where {T} = CubeMap{T}(resource.image, device)
-CubeMap(image::Image, device::Device) = CubeMap{Lava.format_type(image.format)}(image, device)
-function CubeMap{T}(image::Image, device::Device) where {T}
-  images = Matrix{T}[]
-  for face in 1:6
-    push!(images, collect(T, image, device; layer = face))
+function collect_cubemap_faces(cubemap::Resource, device::Device)
+  assert_is_cubemap(cubemap)
+  T = eltype(cubemap.image)
+  faces = Matrix{T}[]
+  for layer in 1:6
+    push!(faces, collect(T, cubemap.image, device; layer))
   end
-  CubeMap{T}(images)
+  CubeMapFaces{T}(ntuple(i -> faces[i], 6)...)
 end
 
-function Lava.Resource(cubemap::CubeMap, device::Device)
-  (; xp, xn, yp, yn, zp, zn) = cubemap
-  data = [xp, xn, yp, yn, zp, zn]
-  image_resource(device, data; name = :environment_cubemap, layers = 6)
-end
-
-function Lava.Texture(cubemap::CubeMap, device::Device)
-  resource = Resource(cubemap, device)
-  default_texture(resource; address_modes = CLAMP_TO_EDGE)
-end
-
-struct EquirectangularMap{T} <: EnvironmentMap{T}
-  data::Matrix{T}
-end
-
-function Lava.Resource(image::EquirectangularMap, device::Device)
-  image_resource(device, image.data; name = :environment_equirectangular_image)
-end
-
-struct Environment{E<:EnvironmentMap} <: GraphicsShaderComponent
+struct Environment{F,E} <: GraphicsShaderComponent
   texture::Texture
 end
 
-Environment(cubemap::CubeMap, device::Device) = Environment{typeof(cubemap)}(Resource(cubemap, device))
-Environment(equirectangular::EquirectangularMap, device::Device) = Environment{typeof(equirectangular)}(Resource(equirectangular, device))
+environment_from_cubemap(resource::Resource) = environment_from_cubemap(resource.image.format, resource)
+environment_from_equirectangular(resource::Resource) = environment_from_equirectangular(resource.image.format, resource)
 
-function Environment{E}(resource::Resource) where {E<:EnvironmentMap}
+environment_from_cubemap(format::Vk.Format, cubemap::Resource) = Environment{format,:cubemap}(cubemap)
+environment_from_equirectangular(format::Vk.Format, resource::Resource) = Environment{format,:equirectangular}(resource)
+
+Environment{F,:equirectangular}(resource::Resource) where {F} = Environment{F,:equirectangular}(environment_texture_equirectangular(resource))
+Environment{F,:cubemap}(resource::Resource) where {F} = Environment{F,:cubemap}(environment_texture_cubemap(resource))
+
   # Make sure we don't have any seams.
-  texture = default_texture(resource; address_modes = CLAMP_TO_EDGE)
-  Environment{E}(texture)
+function environment_texture_equirectangular(resource::Resource)
+  assert_type(resource, RESOURCE_TYPE_IMAGE)
+  default_texture(resource; address_modes = CLAMP_TO_EDGE)
+end
+function environment_texture_cubemap(resource::Resource)
+  assert_is_cubemap(resource)
+  default_texture(resource; address_modes = CLAMP_TO_EDGE)
 end
 
-Accessors.constructorof(::Type{Environment{E}}) where {E<:EnvironmentMap} = Environment{E}
+Accessors.constructorof(::Type{Environment{T,E}}) where {T,E} = Environment{T,E}
 
 interface(env::Environment) = Tuple{Vector{Point3f},Nothing,Nothing}
 user_data(env::Environment, ctx) = instantiate(env.texture, ctx)
@@ -89,21 +82,24 @@ function environment_vert(position, direction, index, (; data)::PhysicalRef{Invo
   direction[] = @load data.vertex_data[index + 1U]::Vec3
 end
 
-function environment_frag(::Type{C}, color, direction, (; data)::PhysicalRef{InvocationData}, textures) where {C<:EnvironmentMap}
+function environment_frag(::Type{V}, color, direction, (; data)::PhysicalRef{InvocationData}, textures) where {V<:Val}
   texture_index = @load data.user_data::DescriptorIndex
   texture = textures[texture_index]
-  color.rgb = sample_along_direction(C, texture, direction)
+  color.rgb = sample_along_direction(V(), texture, direction)
   color.a = 1F
 end
 
-function sample_along_direction(::Type{<:CubeMap}, texture, direction)
+sample_along_direction(::Val{:cubemap}, texture, direction) = sample_from_cubemap(texture, direction)
+sample_along_direction(::Val{:equirectangular}, texture, direction) = sample_from_equirectangular(texture, direction)
+
+function sample_from_cubemap(texture, direction)
   # Convert from Vulkan's right-handed to the cubemap sampler's left-handed coordinate system.
   # To do this, perform an improper rotation, e.g. a mirroring along the Z-axis.
   direction = Vec3(direction.x, direction.y, -direction.z)
   texture(vec4(direction))
 end
 
-function sample_along_direction(::Type{<:EquirectangularMap}, texture, direction)
+function sample_from_equirectangular(texture, direction)
   (x, y, z) = direction
   # Remap equirectangular map coordinates into our coordinate system.
   (x, y, z) = (-z, -x, y)
@@ -132,56 +128,49 @@ function spherical_uv_mapping(direction)
   Vec2(u, v)
 end
 
-function Program(::Type{Environment{C}}, device) where {C<:EnvironmentMap}
+function Program(::Type{Environment{T,E}}, device) where {T,E}
   vert = @vertex device environment_vert(::Vec4::Output{Position}, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device environment_frag(
-    ::Type{C},
+    ::Type{Val{E}},
     ::Vec4::Output,
     ::Vec3::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
-    ::Arr{2048,SPIRV.SampledImage{SPIRV.image_type(C)}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
+    ::Arr{2048,SPIRV.SampledImage{spirv_image_type(T, Val(E))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
   Program(vert, frag)
 end
 
-SPIRV.image_type(::Type{CubeMap{T}}) where {T} = SPIRV.image_type(eltype_to_image_format(T), SPIRV.DimCube, 0, true, false, 1)
-SPIRV.image_type(::Type{CubeMap}) = SPIRV.image_type(CubeMap{RGBA{Float16}})
-SPIRV.image_type(::Type{EquirectangularMap{T}}) where {T} = SPIRV.image_type(eltype_to_image_format(T), SPIRV.Dim2D, 0, false, false, 1)
-SPIRV.image_type(::Type{EquirectangularMap}) = SPIRV.image_type(EquirectangularMap{RGBA{Float16}})
+spirv_image_type(format::Vk.Format, ::Val{:cubemap}) = SPIRV.image_type(SPIRV.ImageFormat(format), SPIRV.DimCube, 0, true, false, 1)
+spirv_image_type(format::Vk.Format, ::Val{:equirectangular}) = SPIRV.image_type(SPIRV.ImageFormat(format), SPIRV.Dim2D, 0, false, false, 1)
 
-CubeMap(equirectangular::EquirectangularMap{TE}, device::Device) where {TE} = CubeMap{TE}(equirectangular, device)
-function CubeMap{TC}(equirectangular::EquirectangularMap{TE}, device::Device) where {TC,TE}
-  (nx, ny) = size(equirectangular.data)
-  @assert nx == 2ny
+function create_cubemap_from_equirectangular(device::Device, equirectangular::Resource)
+  assert_type(equirectangular, RESOURCE_TYPE_IMAGE)
+  (; image) = equirectangular
+  (nx, ny) = dimensions(image)
+  nx == 2ny || error("Expected an image in equirectangular format where `width = 2 * height`, found `width = $nx`, `height = $ny`")
   n = ny
-  T = promote_type(TC, TE)
   # Improvement: Make a single arrayed image (if color attachments with several layers are widely supported).
   # Even if they are, a cubemap usage would probably not be supported, so would need still a transfer at the end.
-  face_attachments = [attachment_resource(device, zeros(T, n, n); usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT) for _ in 1:6]
-  faces = Matrix{T}[]
-  shader = Environment(equirectangular, device)
-  screen = screen_box(face_attachments[1])
-  for (face_attachment, directions) in zip(face_attachments, face_directions(CubeMap))
+  usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT | Vk.IMAGE_USAGE_SAMPLED_BIT
+  cubemap = image_resource(device, nothing; image.format, dims = [n, n], layers = 6, usage_flags)
+  shader = environment_from_equirectangular(equirectangular)
+  screen = screen_box(1.0)
+  for layer in 1:6
+    directions = CUBEMAP_FACE_DIRECTIONS[layer]
     geometry = Primitive(Rectangle(screen, directions, nothing))
-    parameters = ShaderParameters(face_attachment)
+    attachment = attachment_resource(ImageView(cubemap.image; layer_range = layer:layer), WRITE; name = Symbol(:cubemap_layer_, layer))
+    parameters = ShaderParameters(attachment)
     # Improvement: Parallelize face rendering with `render!` and a manually constructed render graph.
     # There is no need to synchronize sequentially with blocking functions as done here.
     render(device, shader, parameters, geometry)
-    face = collect(face_attachment, device)
-    push!(faces, face)
   end
-
-  CubeMap(faces)
+  cubemap
 end
 
-function face_directions(::Type{<:CubeMap})
-  @SVector [
-    Point3f[(1, -1, -1), (1, -1, 1), (1, 1, -1), (1, 1, 1)],     # +X
-    Point3f[(-1, -1, 1), (-1, -1, -1), (-1, 1, 1), (-1, 1, -1)], # -X
-    Point3f[(-1, 1, -1), (1, 1, -1), (-1, 1, 1), (1, 1, 1)],     # +Y
-    Point3f[(-1, -1, 1), (1, -1, 1), (-1, -1, -1), (1, -1, -1)], # -Y
-    Point3f[(-1, -1, -1), (1, -1, -1), (-1, 1, -1), (1, 1, -1)], # +Z
-    Point3f[(1, -1, 1), (-1, -1, 1), (1, 1, 1), (-1, 1, 1)],     # -Z
-  ]
-end
-
-Environment{C}(device::Device, image::EquirectangularMap) where {C<:CubeMap} = Environment(C(device, image, device))
+const CUBEMAP_FACE_DIRECTIONS = @SVector [
+  Point3f[(1, -1, -1), (1, -1, 1), (1, 1, -1), (1, 1, 1)],     # +X
+  Point3f[(-1, -1, 1), (-1, -1, -1), (-1, 1, 1), (-1, 1, -1)], # -X
+  Point3f[(-1, 1, -1), (1, 1, -1), (-1, 1, 1), (1, 1, 1)],     # +Y
+  Point3f[(-1, -1, 1), (1, -1, 1), (-1, -1, -1), (1, -1, -1)], # -Y
+  Point3f[(-1, -1, -1), (1, -1, -1), (-1, 1, -1), (1, 1, -1)], # +Z
+  Point3f[(1, -1, 1), (-1, -1, 1), (1, 1, 1), (-1, 1, 1)],     # -Z
+]
