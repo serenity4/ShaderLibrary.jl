@@ -117,15 +117,19 @@ gamma_corrected(color, γ = 2.2F) = color .^ (inv(γ))
 struct LightProbe{T,R<:Union{Texture,DescriptorIndex}}
   irradiance::R # cubemap
   prefiltered_environment::R # cubemap
-  function LightProbe{T}(irradiance::R, prefiltered_environment::R) where {T,R<:Union{Texture,DescriptorIndex}}
-    new{T,R}(irradiance, prefiltered_environment)
+  brdf_integration_map::R # 2D texture
+  prefiltered_mip_levels::UInt32
+  function LightProbe{T}(irradiance::R, prefiltered_environment::R, brdf_integration_map, prefiltered_mip_levels::Integer) where {T,R<:Union{Texture,DescriptorIndex}}
+    new{T,R}(irradiance, prefiltered_environment, brdf_integration_map, prefiltered_mip_levels)
   end
 end
-function LightProbe(irradiance::Resource, prefiltered_environment::Resource, device::Device)
-  format = irradiance.image.format
+function LightProbe(irradiance::Resource, prefiltered_environment::Resource, brdf_integration_map, device::Device)
+  (; format) = irradiance.image
+  prefiltered_mip_levels = prefiltered_environment.image.mip_levels
   irradiance = environment_texture_cubemap(irradiance)
   prefiltered_environment = environment_texture_cubemap(prefiltered_environment)
-  LightProbe{Vk.format_type(format)}(irradiance, prefiltered_environment)
+  brdf_integration_map = default_texture(brdf_integration_map; address_modes = CLAMP_TO_EDGE)
+  LightProbe{Vk.format_type(format)}(irradiance, prefiltered_environment, brdf_integration_map, prefiltered_mip_levels)
 end
 
 const DEFAULT_LIGHT_PROBE_ELTYPE = RGBA{Float16}
@@ -134,7 +138,8 @@ const DEFAULT_LIGHT_PROBE_TYPE = LightProbe{DEFAULT_LIGHT_PROBE_ELTYPE,Texture}
 function instantiate(probe::LightProbe{P,Texture}, ctx::InvocationDataContext) where {P}
   irradiance = DescriptorIndex(probe.irradiance, ctx)
   prefiltered_environment = DescriptorIndex(probe.prefiltered_environment, ctx)
-  LightProbe{P}(irradiance, prefiltered_environment)
+  brdf_integration_map = DescriptorIndex(probe.brdf_integration_map, ctx)
+  LightProbe{P}(irradiance, prefiltered_environment, brdf_integration_map, probe.prefiltered_mip_levels)
 end
 
 struct PBR{T<:Real,P,LT<:vector_data(Light{T}), LP<:vector_data(LightProbe{P,Texture},LightProbe{P,DescriptorIndex})} <: Material
@@ -157,11 +162,11 @@ function pbr_vert(position, frag_position, frag_normal, index, (; data)::Physica
   position.xyz = world_to_screen_coordinates(frag_position, data)
 end
 
-function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{InvocationData}, textures) where {T<:PBR}
+function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{InvocationData}, textures_env, textures_uv) where {T<:PBR}
   (; camera) = data
   pbr = @load data.user_data::T
   color.rgb = compute_lighting_from_sources(pbr, position, normal, camera)
-  color.rgb += compute_lighting_from_probes(pbr, position, normal, camera, textures)
+  color.rgb += compute_lighting_from_probes(pbr, position, normal, camera, textures_env, textures_uv)
   # XXX: Perform tone-mapping and gamma correction outside of the fragment shader.
   color.rgb = hdr_tone_mapping(color.rgb)
   color.rgb = gamma_corrected(color.rgb)
@@ -175,6 +180,7 @@ function resource_dependencies(pbr::PBR)
   for probe in pbr.probes
     Lava.set!(deps, probe.irradiance.image, Lava.ResourceDependency(Lava.ResourceUsageType(Lava.RESOURCE_USAGE_TEXTURE), Lava.MemoryAccess(Lava.READ), nothing, nothing))
     Lava.set!(deps, probe.prefiltered_environment.image, Lava.ResourceDependency(Lava.ResourceUsageType(Lava.RESOURCE_USAGE_TEXTURE), Lava.MemoryAccess(Lava.READ), nothing, nothing))
+    Lava.set!(deps, probe.brdf_integration_map.image, Lava.ResourceDependency(Lava.ResourceUsageType(Lava.RESOURCE_USAGE_TEXTURE), Lava.MemoryAccess(Lava.READ), nothing, nothing))
   end
   deps
 end
@@ -187,7 +193,8 @@ function Program(::Type{<:PBR{T,P}}, device) where {T,P}
     ::Point3f::Input,
     ::SVector{3,Float32}::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
-    ::Arr{2048,SPIRV.SampledImage{spirv_image_type(Vk.Format(T), Val(:cubemap))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)}
+    ::Arr{2048,SPIRV.SampledImage{spirv_image_type(Vk.Format(T), Val(:cubemap))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)},
+    ::Arr{2048,SPIRV.SampledImage{spirv_image_type(Vk.Format(T))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)},
   )
   Program(vert, frag)
 end
@@ -285,27 +292,32 @@ function compute_lighting_from_sources(pbr::PBR{T}, position, normal, camera::Ca
   res
 end
 
-function compute_lighting_from_probe(bsdf::BSDF{T}, probe::LightProbe{P}, normal, view, textures) where {T,P}
+function compute_lighting_from_probe(bsdf::BSDF{T}, probe::LightProbe{P}, normal, view, textures_env, textures_uv) where {T,P}
   f₀ = lerp(bsdf.base_color, @SVector(ones(T, 3)) .* 0.04F, bsdf.metallic)
   α = bsdf.roughness
   kₛ = surface_reflection_ibl(shape_factor(normal, view), f₀, α)
   kd = one(T) .- kₛ
-  irradiance = point3(textures[probe.irradiance](vec4(normal)).rgb)
+  irradiance = point3(textures_env[probe.irradiance](vec4(normal)).rgb)
   diffuse = bsdf.base_color .* irradiance
-  # XXX: Implement specular lighting.
-  specular = zero(Point3f)
-  brdf = kₛ .* specular .+ kd .* diffuse
+  lod = select_mip_level_from_roughness(probe, α)
+  reflection = reflect(-view, normal)
+  prefiltered_color = point3(textures_env[probe.prefiltered_environment](vec4(reflection), lod).rgb)
+  scale, bias = textures_uv[probe.brdf_integration_map](Vec2(shape_factor(normal, view), α)).rg
+  specular = prefiltered_color * (kₛ .* scale .+ bias)
+  brdf = kd .* diffuse .+ specular
   btdf = one(T)
   scattering = brdf .* btdf
   scattering
 end
 
-function compute_lighting_from_probes(pbr::PBR{T}, position, normal, camera::Camera, textures) where {T}
+select_mip_level_from_roughness(probe::LightProbe, roughness) = roughness * (probe.prefiltered_mip_levels)F
+
+function compute_lighting_from_probes(pbr::PBR{T}, position, normal, camera::Camera, textures_env, textures_uv) where {T}
   res = zero(Point{3,T})
   camera_position = apply_translation(zero(Point{3,T}), camera.transform)
   view = normalize(camera_position - position)
   for probe in pbr.probes
-    res += compute_lighting_from_probe(pbr.bsdf, probe, normal, view, textures)
+    res += compute_lighting_from_probe(pbr.bsdf, probe, normal, view, textures_env, textures_uv)
   end
   res
 end

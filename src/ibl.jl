@@ -112,11 +112,10 @@ function radical_inverse_vdc(bits::UInt32)
   float(bits) * 2.3283064365386963f-10 # 0x100000000
 end
 "Generate a low discrepancy sequence using the [Hammersley set](https://en.wikipedia.org/wiki/Low-discrepancy_sequence#Hammersley_set)."
-hammersley(i::UInt32, n) = Vec2(float(i)/float(n), radical_inverse_vdc(i))
+hammersley(i::UInt32, n) = Vec2((i)F/n, radical_inverse_vdc(i))
 
 """
     importance_sampling_ggx((a, b), α)
-    importance_sampling_ggx((a, b), α, Ω::Rotation)
     importance_sampling_ggx((a, b), α, normal)
 
 Generate a microfacet normal using importance sampling, such that light reflected on it contributes to the lighting.
@@ -124,13 +123,13 @@ Generate a microfacet normal using importance sampling, such that light reflecte
 `a` and `b` are two random numbers between 0 and 1, used to generate a normal vector disturbed on the tangent/bitangent directions.
 `α` is the roughness of the surface, used to predict a sampling shape that is more widely spread for larger roughness values.
 
-If a rotation or normal is provided as a third argument, the result will be converted from tangent space to world space.
+If a normal is provided as a third argument, it will be used to convert the result from tangent space to world space.
 """
 function importance_sampling_ggx end
 
-function importance_sampling_ggx((a, b), α)
+function importance_sampling_ggx((a, b), roughness)
   # Generate spherical angles from the two random nubmers `a` and `b`.
-  α² = α^2
+  α² = roughness^2
   ϕ = 2πF * a
   sinϕ, cosϕ = sincos(ϕ)
   cosθ = sqrt((one(b) - b) / (one(b) + (α²^2 - one(b)) * b))
@@ -140,8 +139,18 @@ function importance_sampling_ggx((a, b), α)
   Point(sinθ * cosϕ, sinθ * sinϕ, cosθ)
 end
 
-importance_sampling_ggx((a, b), α, Ω::Rotation) = apply_rotation(importance_sampling_ggx((a, b), α), Ω)
-importance_sampling_ggx((a, b), α, microfacet_normal) = importance_sampling_ggx((a, b), α, Rotation(Point3f(0, 0, 1), point3(microfacet_normal)))
+function importance_sampling_ggx((a, b), roughness, normal::Vec3)
+  # Cartesian microfacet vector in tangent space.
+  microfacet = importance_sampling_ggx((a, b), roughness)
+
+  # Find a tangent frame expressed in world space.
+  up = abs(normal.z) < 0.999 ? Vec3(0.0, 0.0, 1.0) : Vec3(1.0, 0.0, 0.0)
+  tangent = normalize(up × normal)
+  bitangent = normal × tangent
+
+  # Convert from tangent space to world space using the tangent frame.
+  normalize(tangent * microfacet.x + bitangent * microfacet.y + normal * microfacet.z)
+end
 
 # -------------------------------------------------
 
@@ -217,4 +226,61 @@ end
 function compute_prefiltered_environment(environment::Resource, device::Device; base_resolution = 256, mip_levels = Int(log2(base_resolution)) - 2, usage_flags = Vk.IMAGE_USAGE_TRANSFER_SRC_BIT | Vk.IMAGE_USAGE_SAMPLED_BIT)
   result = image_resource(device, nothing; dims = [base_resolution, base_resolution], format = environment.image.format, layers = 6, mip_levels, usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | usage_flags, name = :prefiltered_environment)
   compute_prefiltered_environment!(result, environment, device)
+end
+
+struct BRDFIntegration <: GraphicsShaderComponent end
+
+interface(shader::BRDFIntegration) = Tuple{Vector{Vec2},Nothing,Nothing}
+
+function brdf_integration_vert(position, uv, index, (; data)::PhysicalRef{InvocationData})
+  position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1], data)
+  position.z = 1
+  uv[] = @load data.vertex_data[index + 1]::Vec2
+end
+
+function brdf_integration_frag(color, uv, (; data)::PhysicalRef{InvocationData})
+  (sᵥ, roughness) = uv
+  NUMBER_OF_SAMPLES = 4096U
+  scale, bias = 0F, 0F
+  view = Vec3(sqrt(1F - sᵥ^2), 0F, sᵥ)
+  normal = Vec3(0, 0, 1)
+  for i in 1U:NUMBER_OF_SAMPLES
+    # Generate a microfacet direction roughly aligned with the normal.
+    # Then, negate that direction because the microfacet is meant to face the normal.
+    microfacet = importance_sampling_ggx(hammersley(i, NUMBER_OF_SAMPLES), roughness, normal)
+
+    # Generate the light direction, taken to be a simple reflection of the view direction along the microfacet normal.
+    # The view direction is negated to have the light direction face the correct side (from the microfacet normal to the light source).
+    light = reflect(-view, microfacet)
+
+    # Add the contribution to the lighting value.
+    # If the microfacet normal was generated with an adequate importance sampling method,
+    # the required condition should be satisfied most of the time.
+
+    sₗ = max(light.z, 0F) # = shape_factor(const normal, light)
+    if !iszero(sₗ)
+      sₕ = max(microfacet.z, 0F) # = # shape_factor(const normal, microfacet)
+      occlusion = microfacet_occlusion_factor(remap_roughness_image_based_lighting(roughness), sᵥ, sₗ)
+      sᵥₕ = shape_factor(view, microfacet)
+      visibility = occlusion * sᵥₕ / (sₕ * sᵥ)
+      α = pow5(1F - sᵥₕ)
+      scale += (1F - α) * visibility
+      bias += α * visibility
+    end
+  end
+  scale /= NUMBER_OF_SAMPLES
+  bias /= NUMBER_OF_SAMPLES
+  color.r = scale
+  color.g = bias
+  color.a = 1F
+end
+
+function Program(::Type{BRDFIntegration}, device)
+  vert = @vertex device brdf_integration_vert(::Vec4::Output{Position}, ::Vec2::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+  frag = @fragment device brdf_integration_frag(
+    ::Vec4::Output,
+    ::Vec2::Input,
+    ::PhysicalRef{InvocationData}::PushConstant
+  )
+  Program(vert, frag)
 end

@@ -71,25 +71,34 @@
     geometry = Primitive(Rectangle(screen, directions, nothing))
     render(device, shader, parameters, geometry)
     data = collect(color, device)
-    save_test_render("prefiltered_pz_mip1.png", data, 0x5339e496001f9c5e)
+    save_test_render("prefiltered_pz_mip1.png", data, 0xa06d4a5066eec7b2)
 
     prefiltered_environment = compute_prefiltered_environment(cubemap, device; base_resolution = 1024)
     @test prefiltered_environment.image.mip_levels > 4
     data = collect(ImageView(prefiltered_environment.image; layer_range = 5:5, mip_range = 2:2), device)
     @test size(data) == (512, 512)
-    save_test_render("prefiltered_pz_mip2.png", data, 0xe8daaff23227c4d5)
+    save_test_render("prefiltered_pz_mip2.png", data, 0x232ad074e7a8ba4a)
     data = collect(ImageView(prefiltered_environment.image; layer_range = 5:5, mip_range = 4:4), device)
     @test size(data) == (128, 128)
-    save_test_render("prefiltered_pz_mip4.png", data, 0x0cb2e537faab6792)
+    save_test_render("prefiltered_pz_mip4.png", data, 0x09dd20a071dd7ed5)
+
+    uvs = Vec2[(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)]
+    shader = BRDFIntegration()
+    brdf_integration_map_color = similar(color; dims = [512, 512], usage_flags = color.attachment.view.image.usage_flags | Vk.IMAGE_USAGE_SAMPLED_BIT)
+    geometry = Primitive(Rectangle(screen_box(1.0), uvs, nothing))
+    render(device, shader, (@set parameters.color[1] = brdf_integration_map_color), geometry)
+    data = collect(brdf_integration_map_color, device)
+    save_test_render("brdf_integration_map.png", data, 0x2fa125c4d084a5b5)
+    brdf_integration_map = Resource(brdf_integration_map_color.attachment.view.image; name = :brdf_integration_map)
 
     @testset "Shading" begin
       gltf = read_gltf("blob.gltf")
-      bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 0, 0.5, 0.02)
+      bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 0, 0.3, 0.02)
       camera = import_camera(gltf)
       mesh = import_mesh(gltf)
       primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = import_transform(gltf.nodes[end]; apply_rotation = false))
 
-      probe = LightProbe(irradiance, prefiltered_environment, device)
+      probe = LightProbe(irradiance, prefiltered_environment, brdf_integration_map, device)
       pbr = PBR(bsdf, Light{Float32}[], [probe])
       env = environment_from_cubemap(cubemap)
       depth = attachment_resource(Vk.FORMAT_D32_SFLOAT, dimensions(color))

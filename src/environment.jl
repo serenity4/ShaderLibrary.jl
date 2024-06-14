@@ -139,8 +139,10 @@ function Program(::Type{Environment{T,E}}, device) where {T,E}
   Program(vert, frag)
 end
 
+spirv_image_type(format::Vk.Format) = spirv_image_type(format, Val(:texture))
 spirv_image_type(format::Vk.Format, ::Val{:cubemap}) = SPIRV.image_type(SPIRV.ImageFormat(format), SPIRV.DimCube, 0, true, false, 1)
-spirv_image_type(format::Vk.Format, ::Val{:equirectangular}) = SPIRV.image_type(SPIRV.ImageFormat(format), SPIRV.Dim2D, 0, false, false, 1)
+spirv_image_type(format::Vk.Format, ::Val{:texture}) = SPIRV.image_type(SPIRV.ImageFormat(format), SPIRV.Dim2D, 0, false, false, 1)
+spirv_image_type(format::Vk.Format, ::Val{:equirectangular}) = spirv_image_type(format)
 
 function create_cubemap_from_equirectangular(device::Device, equirectangular::Resource)
   assert_type(equirectangular, RESOURCE_TYPE_IMAGE)
