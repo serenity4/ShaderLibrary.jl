@@ -112,7 +112,7 @@ end
 # For a more elaborate tone mapping, see http://www.oscars.org/science-technology/sci-tech-projects/aces.
 hdr_tone_mapping(intensity) = intensity ./ (1F .+ intensity)
 "Gamma correction warps a linear RGB range in a way that appears more realistic from a visual perception standpoint."
-gamma_corrected(color, γ = 2.2F) = color .^ (inv(γ))
+gamma_corrected(color, γ = 2.2F) = color .^ inv(γ)
 
 struct LightProbe{T,R<:Union{Texture,DescriptorIndex}}
   irradiance::R # cubemap
@@ -170,6 +170,7 @@ function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{Invo
   # XXX: Perform tone-mapping and gamma correction outside of the fragment shader.
   color.rgb = hdr_tone_mapping(color.rgb)
   color.rgb = gamma_corrected(color.rgb)
+  color.rgb = clamp.(color.rgb, 0F, 1F)
   color.a = 1F
 end
 user_data(pbr::PBR{<:Any,P}, ctx::InvocationDataContext) where {P} = PBR(pbr.bsdf, instantiate(pbr.lights, ctx), instantiate(LightProbe{P,DescriptorIndex}, pbr.probes, ctx))
@@ -292,17 +293,19 @@ function compute_lighting_from_sources(pbr::PBR{T}, position, normal, camera::Ca
   res
 end
 
-function compute_lighting_from_probe(bsdf::BSDF{T}, probe::LightProbe{P}, normal, view, textures_env, textures_uv) where {T,P}
-  f₀ = lerp(bsdf.base_color, @SVector(ones(T, 3)) .* 0.04F, bsdf.metallic)
+function compute_lighting_from_probe(bsdf::BSDF{T}, probe::LightProbe{P}, normal, view, irradiance, prefiltered_environment, brdf_integration_map) where {T,P}
+  f₀ = lerp(@SVector(ones(T, 3)) .* 0.04F, bsdf.base_color, bsdf.metallic)
   α = bsdf.roughness
   kₛ = surface_reflection_ibl(shape_factor(normal, view), f₀, α)
   kd = one(T) .- kₛ
-  irradiance = point3(textures_env[probe.irradiance](vec4(normal)).rgb)
+  kd *= 1F - bsdf.metallic
+  irradiance = point3(sample_from_cubemap(irradiance, normal).rgb)
   diffuse = bsdf.base_color .* irradiance
   lod = select_mip_level_from_roughness(probe, α)
   reflection = reflect(-view, normal)
-  prefiltered_color = point3(textures_env[probe.prefiltered_environment](vec4(reflection), lod).rgb)
-  scale, bias = textures_uv[probe.brdf_integration_map](Vec2(shape_factor(normal, view), α)).rg
+  prefiltered_color = point3(sample_from_cubemap(prefiltered_environment, reflection, lod).rgb)
+  uv = Vec2(shape_factor(normal, view), α)
+  scale, bias = brdf_integration_map(uv).rg
   specular = prefiltered_color * (kₛ .* scale .+ bias)
   brdf = kd .* diffuse .+ specular
   btdf = one(T)
@@ -317,7 +320,10 @@ function compute_lighting_from_probes(pbr::PBR{T}, position, normal, camera::Cam
   camera_position = apply_translation(zero(Point{3,T}), camera.transform)
   view = normalize(camera_position - position)
   for probe in pbr.probes
-    res += compute_lighting_from_probe(pbr.bsdf, probe, normal, view, textures_env, textures_uv)
+    irradiance = textures_env[probe.irradiance]
+    prefiltered_environment = textures_env[probe.prefiltered_environment]
+    brdf_integration_map = textures_uv[probe.brdf_integration_map]
+    res += compute_lighting_from_probe(pbr.bsdf, probe, normal, view, irradiance, prefiltered_environment, brdf_integration_map)
   end
   res
 end

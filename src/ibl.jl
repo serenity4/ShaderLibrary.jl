@@ -33,7 +33,7 @@ function convolve_hemisphere(f, ::Type{T}, center, dθ, dϕ) where {T}
       direction = Point(sinθ * cosϕ, sinθ * sinϕ, cosθ)
       direction = apply_rotation(direction, q)
       # Sum the new value, weighted by sinθ to balance out the skewed distribution toward the pole.
-      value = value .+ f(vec4(direction), θ, ϕ) .* sinθ
+      value = value .+ f(direction, θ, ϕ) .* sinθ
     end
   end
   value ./ n
@@ -51,7 +51,8 @@ function irradiance_convolution_frag(irradiance, location, (; data)::PhysicalRef
   dθ = 0.025F
   dϕ = 0.025F
   value = convolve_hemisphere(Vec3, location, dθ, dϕ) do direction, θ, ϕ
-    texture(direction).rgb .* cos(θ)
+    @inline
+    sample_from_cubemap(texture, direction).rgb .* cos(θ)
   end
   irradiance.rgb = value .* πF
   irradiance.a = 1F

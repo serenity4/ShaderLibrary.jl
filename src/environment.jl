@@ -92,18 +92,24 @@ end
 sample_along_direction(::Val{:cubemap}, texture, direction) = sample_from_cubemap(texture, direction)
 sample_along_direction(::Val{:equirectangular}, texture, direction) = sample_from_equirectangular(texture, direction)
 
-function sample_from_cubemap(texture, direction)
-  # Convert from Vulkan's right-handed to the cubemap sampler's left-handed coordinate system.
-  # To do this, perform an improper rotation, e.g. a mirroring along the Z-axis.
-  direction = Vec3(direction.x, direction.y, -direction.z)
-  texture(vec4(direction))
+"""
+Convert from the world coordinate system (right-handed, +Z up)
+to the cubemap sampler's coordinate system (left-handed, +Y up).
+"""
+world_to_cubemap(direction) = typeof(direction)(-direction.y, direction.z, direction.x)
+
+"""
+Perform the inverse conversion from cubemap coordinates into world coordinates.
+"""
+cubemap_to_world(direction) = typeof(direction)(-direction.z, -direction.x, direction.y)
+
+function sample_from_cubemap(texture, direction, sampling_parameters...)
+  direction = world_to_cubemap(direction)
+  texture(vec4(direction), sampling_parameters...)
 end
 
 function sample_from_equirectangular(texture, direction)
-  (x, y, z) = direction
-  # Remap equirectangular map coordinates into our coordinate system.
-  (x, y, z) = (-z, -x, y)
-  uv = spherical_uv_mapping(Vec3(x, y, z))
+  uv = spherical_uv_mapping(vec3(direction))
   # Make sure we are using fine derivatives,
   # given that there is a discontinuity along the `u` coordinate.
   # This should already be the case for most hardware,
@@ -168,11 +174,20 @@ function create_cubemap_from_equirectangular(device::Device, equirectangular::Re
   cubemap
 end
 
-const CUBEMAP_FACE_DIRECTIONS = @SVector [
+"""
+Set of directions covering all cubemap faces, in world coordinates.
+
+The order and orientation of the faces follow cubemap conventions;
+when converted to cubemap coordinates, they come in the order
++X, -X, +Y, -Y, +Z, -Z. In world coordinates, these faces may
+be rotated and do not follow the same order because the frame of
+reference differs.
+"""
+const CUBEMAP_FACE_DIRECTIONS = (x -> cubemap_to_world.(x)).(@SVector [
   Point3f[(1, -1, -1), (1, -1, 1), (1, 1, -1), (1, 1, 1)],     # +X
   Point3f[(-1, -1, 1), (-1, -1, -1), (-1, 1, 1), (-1, 1, -1)], # -X
   Point3f[(-1, 1, -1), (1, 1, -1), (-1, 1, 1), (1, 1, 1)],     # +Y
   Point3f[(-1, -1, 1), (1, -1, 1), (-1, -1, -1), (1, -1, -1)], # -Y
   Point3f[(-1, -1, -1), (1, -1, -1), (-1, 1, -1), (1, 1, -1)], # +Z
   Point3f[(1, -1, 1), (-1, -1, 1), (1, 1, 1), (-1, 1, 1)],     # -Z
-]
+])

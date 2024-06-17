@@ -1,9 +1,10 @@
 @testset "Scene" begin
   @testset "Camera" begin
-    camera = Camera(; focal_length = 0.35, far_clipping_plane = 10)
-    @test focal_length(camera) == 0.35F
-    @test field_of_view(camera) ≈ 2.4682431F
-    @test focal_length(field_of_view(camera)) ≈ 0.35F
+    camera = Camera(; focal_length = 0.05F)
+    @test focal_length(camera) == 0.05F
+    hfov, yfov = field_of_view(camera)
+    @test hfov ≈ (39.59776°)F
+    @test focal_length(hfov) ≈ focal_length(camera)
 
     p = Vec3(0.4, 0.5, 1.7)
     p′ = project(p, camera)
@@ -53,6 +54,9 @@
     @test camera.transform.translation === Translation(4.1198707F, -4.3737516F, 3.02657F)
     @test camera.transform.rotation === Quaternion{Float32}(-0.7725191, -0.5305388, -0.19752686, -0.28762126)
     @test camera.transform.scaling === one(Scaling{3,Float32})
+    @test camera.focal_length == 0.05F
+    # Make sure we get back Blender's declared field of view.
+    @test horizontal_field_of_view(camera.focal_length; aspect_ratio = 16/9, sensor_size = 0.036F) ≈ 39.6°
 
     lights = import_lights(gltf)
     @test length(lights) == 1

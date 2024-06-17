@@ -1,3 +1,5 @@
+const CAMERA_SENSOR_SIZE_FULL_FRAME = (0.036, 0.024)
+
 """
 Pinhole camera with a hole that is infinitely small.
 
@@ -16,10 +18,12 @@ the far clipping plane.
 @struct_hash_equal_isapprox Base.@kwdef struct Camera
   "Focal length (zero for an orthographic camera)."
   focal_length::Float32 = 0.0
+  "Sensor size, in meters. Ignored for orthographic projections."
+  sensor_size::NTuple{2, Float32} = CAMERA_SENSOR_SIZE_FULL_FRAME
   """
   Extent of the camera on the X and Y axes for orthographic projections.
 
-  This field is ignored for perspective projections.
+  Ignored for perspective projections.
   """
   extent::NTuple{2, Float32} = (2, 2)
   near_clipping_plane::Float32 = 0
@@ -27,13 +31,26 @@ the far clipping plane.
   transform::Transform{3,Float32,Quaternion{Float32}} = Transform{3,Float32}()
 end
 
+aspect_ratio(camera::Camera) = aspect_ratio(camera.sensor_size)
+
 "Get the focal length of the camera (in no specific unit)."
 focal_length(camera::Camera) = camera.focal_length
-"Get the field of view of the camera, in radians."
-field_of_view(camera::Camera) = field_of_view(focal_length(camera))
+focal_length(field_of_view; aspect_ratio = 1, sensor_size = CAMERA_SENSOR_SIZE_FULL_FRAME[1]) = 1/max(aspect_ratio, 1) * sensor_size/2tan(field_of_view/2)
 
-field_of_view(focal_length) = 2atan(1/focal_length)
-focal_length(field_of_view) = 1/tan(field_of_view/2)
+horizontal_field_of_view(camera::Camera; aspect_ratio = aspect_ratio(camera)) = horizontal_field_of_view(camera.focal_length; aspect_ratio, sensor_size = camera.sensor_size[1])
+horizontal_field_of_view(focal_length; aspect_ratio = 1, sensor_size = CAMERA_SENSOR_SIZE_FULL_FRAME[1]) = 2atan(sensor_size/2focal_length)
+
+vertical_field_of_view(camera::Camera; aspect_ratio = aspect_ratio(camera)) = vertical_field_of_view(camera.focal_length; aspect_ratio, sensor_size = camera.sensor_size[2])
+vertical_field_of_view(focal_length; aspect_ratio = 1, sensor_size = CAMERA_SENSOR_SIZE_FULL_FRAME[2]) = 2atan(sensor_size/2focal_length)
+
+field_of_view(camera::Camera; aspect_ratio = aspect_ratio(camera)) = field_of_view(camera.focal_length; aspect_ratio, camera.sensor_size)
+function field_of_view(focal_length; sensor_size = CAMERA_SENSOR_SIZE_FULL_FRAME, aspect_ratio = aspect_ratio(sensor_size))
+  hfov = horizontal_field_of_view(focal_length; aspect_ratio, sensor_size = sensor_size[1])
+  vfov = vertical_field_of_view(focal_length; aspect_ratio, sensor_size = sensor_size[2])
+  (hfov, vfov)
+end
+
+isorthogonal(camera::Camera) = iszero(camera.focal_length)
 
 """
 Project the point `p` through the given `camera`, computing its depth in the resulting Z coordinate.
@@ -49,7 +66,7 @@ The following transformations are performed on the point:
 A focal length of zero (default) is taken to perform orthographic projections, while a nonzero focal length will be taken to perform perspective projections.
 """
 function project(p::Point3f, camera::Camera)
-  iszero(camera.focal_length) && return orthogonal_projection(p, camera)
+  isorthogonal(camera) && return orthogonal_projection(p, camera)
   perspective_projection(p, camera)
 end
 project(p::Vec3, camera::Camera) = vec3(project(point3(p), camera))
@@ -70,9 +87,26 @@ function perspective_projection(p::Point3f, camera::Camera)
   p = apply_transform_inverse(p, camera.transform)
   p = apply_fixed_camera_transform_inverse(p)
   depth = remap(p.z, camera.near_clipping_plane, camera.far_clipping_plane, 0F, 1F)
-  scale = camera.focal_length/p.z
-  p′ = Point3f(p.x * scale, p.y * scale, depth)
+  sx, sy = perspective_projection_scaling(camera, p)
+  p′ = Point3f(p.x * sx, p.y * sy, depth)
+  project_onto_sensor(p′, camera)
 end
+
+function project_onto_sensor(p, camera::Camera)
+  (; sensor_size) = camera
+  ar = aspect_ratio(camera)
+  limit = ifelse(ar ≥ 1, sensor_size[2], sensor_size[1])
+  magnify = remap(-limit/2F, limit/2F, -1F, 1F)
+  Point3f(magnify(p.x), magnify(p.y), p.z)
+end
+
+function projection_scaling(camera::Camera, p)
+  isorthogonal(camera) && return orthogonal_projection_scaling(camera)
+  perspective_projection_scaling(camera, p)
+end
+
+orthogonal_projection_scaling(camera::Camera) = camera.extent ./ 2F
+perspective_projection_scaling(camera::Camera, p) = ntuple(_ -> camera.focal_length/p.z, 2)
 
 """
 Perform the orthogonal projection of `p` through the `camera`.
@@ -85,8 +119,19 @@ function orthogonal_projection(p::Point3f, camera::Camera)
   p = apply_scaling(p, inv(camera.transform.scaling))
   p = apply_fixed_camera_transform_inverse(p)
   depth = remap(p.z, camera.near_clipping_plane, camera.far_clipping_plane, 0F, 1F)
-  sx, sy = camera.extent ./ 2
-  p′ = Point3f(p.x/sx, p.y/sy, depth)
+  sx, sy = orthogonal_projection_scaling(camera)
+  p′ = typeof(p)(p.x * sx, p.y * sy, depth)
+end
+
+"""
+Return a cropping factor in ]0, 1] along X and Y axes corresponding to how much
+cropping is needed to fit the target `aspect_ratio` into the camera sensor.
+"""
+function cropping_factor(camera::Camera, ar)
+  effective_ar = ar/aspect_ratio(camera)
+  xcrop = min(one(ar), effective_ar)
+  ycrop = min(one(ar), one(ar)/effective_ar)
+  (xcrop, ycrop)
 end
 
 function screen_semidiagonal(aspect_ratio::Number)

@@ -30,11 +30,11 @@
     mesh = import_mesh(gltf)
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform = Transform(rotation = Rotation(RotationPlane(1.0, 0.0, 1.0), 0.3π)))
     camera = import_camera(gltf)
-    pbr_parameters = setproperties(parameters, (; camera))
+    pbr_parameters = setproperties(parameters; camera)
 
     render(device, pbr, pbr_parameters, primitive)
     data = collect(color, device)
-    save_test_render("shaded_cube_pbr.png", data, 0x18e6e9146b6d3548)
+    save_test_render("shaded_cube_pbr.png", data, 0x6462f25893468519)
   end
 
   @testset "Shaded blob" begin
@@ -49,7 +49,7 @@
     pbr = PBR(bsdf, lights)
     render(device, pbr, pbr_parameters, primitive)
     data = collect(color, device)
-    save_test_render("shaded_blob_pbr.png", data, 0x7971a675275af2c8)
+    save_test_render("shaded_blob_pbr.png", data, 0xe3ca002e58aa947d)
   end
 
   @testset "Image-based lighting" begin
@@ -63,7 +63,7 @@
     geometry = Primitive(Rectangle(screen, directions, nothing))
     render(device, shader, parameters, geometry)
     data = collect(color, device)
-    save_test_render("irradiance_nx.png", data, 0x19d4950653f3984c)
+    save_test_render("irradiance_nx.png", data, 0x6f7797a2c29a23c9)
 
     prefiltered_environment = compute_prefiltered_environment(cubemap, device; mip_levels = 1)
     shader = environment_from_cubemap(prefiltered_environment)
@@ -71,16 +71,16 @@
     geometry = Primitive(Rectangle(screen, directions, nothing))
     render(device, shader, parameters, geometry)
     data = collect(color, device)
-    save_test_render("prefiltered_pz_mip1.png", data, 0xa06d4a5066eec7b2)
+    save_test_render("prefiltered_pz_mip1.png", data, 0x11deaf2c1a86fd84)
 
     prefiltered_environment = compute_prefiltered_environment(cubemap, device; base_resolution = 1024)
     @test prefiltered_environment.image.mip_levels > 4
     data = collect(ImageView(prefiltered_environment.image; layer_range = 5:5, mip_range = 2:2), device)
     @test size(data) == (512, 512)
-    save_test_render("prefiltered_pz_mip2.png", data, 0x232ad074e7a8ba4a)
+    save_test_render("prefiltered_pz_mip2.png", data, 0x19afaa4e20b9bd72)
     data = collect(ImageView(prefiltered_environment.image; layer_range = 5:5, mip_range = 4:4), device)
     @test size(data) == (128, 128)
-    save_test_render("prefiltered_pz_mip4.png", data, 0x09dd20a071dd7ed5)
+    save_test_render("prefiltered_pz_mip4.png", data, 0x6607c8646b2745f9)
 
     uvs = Vec2[(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)]
     shader = BRDFIntegration()
@@ -104,7 +104,7 @@
         depth = attachment_resource(Vk.FORMAT_D32_SFLOAT, dimensions(color))
         env_parameters = setproperties(parameters, (; depth, depth_clear = ClearValue(1f0)))
         pbr_parameters = setproperties(parameters, (; camera, depth, color_clear = [nothing]))
-        background = renderables(env, env_parameters, device, Primitive(Rectangle(color; camera.transform)))
+        background = renderables(env, env_parameters, device, Primitive(Rectangle(color, camera)))
         blob = renderables(pbr, pbr_parameters, device, primitive)
         nodes = RenderNode[background, blob]
         render(device, nodes)
@@ -112,28 +112,30 @@
 
       @testset "Specular only" begin
         # Dielectric
-        bsdf = BSDF{Float32}((0.0, 0.0, 0.0), 0, 0.5, 0.02)
+        bsdf = BSDF{Float32}((0.0, 0.0, 0.0), 0, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
         save_test_render("shaded_blob_pbr_ibl_dielectric.png", data)
 
-        # Dielectric (colored)
-        bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 0, 0.5, 0.02)
-        render_pbr_blob(bsdf)
-        data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_dielectric_colored.png", data)
-
-        # Metallic (colored)
-        bsdf = BSDF{Float32}((0.0, 0.0, 0.0), 1, 0.5, 0.02)
+        # Metallic (black)
+        bsdf = BSDF{Float32}((0.0, 0.0, 0.0), 1, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
         save_test_render("shaded_blob_pbr_ibl_metallic.png", data)
 
         # Metallic (colored)
-        bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 1, 0.5, 0.02)
+        bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 1, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
         save_test_render("shaded_blob_pbr_ibl_metallic_colored.png", data)
+      end
+
+      @testset "Specular + Diffuse" begin
+        # Dielectric (colored)
+        bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 0, 0.3, 0.02)
+        render_pbr_blob(bsdf)
+        data = collect(color, device)
+        save_test_render("shaded_blob_pbr_ibl_dielectric_colored.png", data)
       end
     end
   end

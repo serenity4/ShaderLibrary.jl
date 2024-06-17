@@ -88,6 +88,7 @@ export
 
   # Graphics shader components
   GaussianBlurDirectional, BLUR_HORIZONTAL, BLUR_VERTICAL, GaussianBlur,
+  Text,
   IrradianceConvolution, compute_irradiance,
   PrefilteredEnvironmentConvolution, compute_prefiltered_environment,
 
@@ -95,7 +96,9 @@ export
   GammaCorrection,
   LargeScaleErosion,
 
-  Camera, project,
+  Camera, focal_length,
+  field_of_view, horizontal_field_of_view, vertical_field_of_view,
+  project,
   remap,
 
   # Imports

@@ -21,6 +21,7 @@
     end
 
     geometry = Primitive(Rectangle(color))
+    @reset geometry.mesh.vertex_data = cubemap_to_world.(geometry.mesh.vertex_data)
     render(device, shader, parameters, geometry)
     data = collect(color, device)
     save_test_render("environment_zp_wide.png", data, 0x46289a67db54dec4)
@@ -52,7 +53,7 @@
     uv = spherical_uv_mapping(Vec3(1, 0, 1))
     @test uv == Vec2(0.5, 0.25)
 
-    hs = [0xd3941e06837b58df, 0x8f59a7dd59eadec6, (0x3c8f8f5b3535ff3f, 0xcc0b4c5a06ba5247), (0x8d9ce4330af39594, 0xccfeef55a725388c), 0xa5192e2c31023afd, 0x45a62f8c8992d9ed]
+    hs = [0xda5bd6175ce45b76, 0xe223ea91f3d6c6f7, 0x0fb18d0041e939ca, 0x920a8c6eb4112c0e, 0x4488aec1a4eb18f4, 0x878c86875caba565]
     for (directions, name, h) in zip(CUBEMAP_FACE_DIRECTIONS, fieldnames(CubeMapFaces), hs)
       geometry = Primitive(Rectangle(screen, directions, nothing))
       render(device, shader, parameters_square, geometry)
@@ -73,5 +74,18 @@
       data = collect(color_square, device)
       save_test_render("environment_from_equirectangular_$name.png", data, h; keep = false)
     end
+  end
+
+  @testset "Perspective rendering of environments" begin
+    equirectangular = image_resource(device, read_jpeg(asset("equirectangular.jpeg")); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT)
+    cubemap = create_cubemap_from_equirectangular(device, equirectangular)
+
+    gltf = read_gltf("blob.gltf")
+    camera = import_camera(gltf)
+    env = environment_from_cubemap(cubemap)
+    background = renderables(env, parameters, device, Primitive(Rectangle(color, camera)))
+    render(device, background)
+    data = collect(color, device)
+    save_test_render("blob_background.png", data, 0xa4a6dbc1e4ea13d5)
   end
 end;

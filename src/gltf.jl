@@ -48,7 +48,11 @@ function import_camera(gltf::GLTF.Object, node::GLTF.Node)
   camera = gltf.cameras[node.camera]
   (; orthographic, perspective) = camera
   if !isnothing(perspective)
-    Camera(; focal_length = focal_length(perspective.yfov), near_clipping_plane = perspective.znear, far_clipping_plane = perspective.zfar, transform)
+    # Assume that the sensor size is standard,
+    # since there is no sensor size information in there.
+    sensor_size = CAMERA_SENSOR_SIZE_FULL_FRAME
+    f = focal_length(perspective.yfov; aspect_ratio = perspective.aspectRatio, sensor_size = sensor_size[1])
+    Camera(; focal_length = f, sensor_size, near_clipping_plane = perspective.znear, far_clipping_plane = perspective.zfar, transform)
   elseif !isnothing(orthographic)
     extent = (orthographic.xmag, orthographic.ymag)
     Camera(; extent, near_clipping_plane = orthographic.znear, far_clipping_plane = orthographic.zfar, transform)

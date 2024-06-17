@@ -16,8 +16,25 @@ function Primitive(rect::Rectangle, transform::Transform = Transform())
   Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE; transform, data = rect.primitive_data)
 end
 
-function Rectangle(color::Resource, primitive_data = nothing; transform::Transform = Transform())
-  screen = screen_box(aspect_ratio(color))
-  directions = [apply_rotation(Point3f(p..., -1F), transform.rotation) for p in PointSet(screen)]
+function Rectangle(color::Resource; primitive_data = nothing)
+  screen = screen_box(color)
+  set = PointSet(screen)
+  directions = [Point3f(p..., -1F) for p in set]
+  Rectangle(screen, directions, primitive_data)
+end
+
+function Rectangle(color::Resource, camera::Camera; primitive_data = nothing)
+  (; sensor_size) = camera
+  crop = cropping_factor(camera, aspect_ratio(color))
+  screen = screen_box(color)
+  set = PointSet(screen)
+  directions = [begin
+    # Define p′ as one of the corners of the image plane,
+    # located at z = -focal_length and whose extent in the
+    # XY plane is that of the sensor.
+    xy = sign.(p) .* sensor_size ./ 2 .* crop
+    p′ = Point3f(xy..., -camera.focal_length)
+    apply_rotation(p′, camera.transform.rotation)
+  end for p in set]
   Rectangle(screen, directions, primitive_data)
 end
