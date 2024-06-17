@@ -136,7 +136,7 @@
     cube_parameters = setproperties(parameters, (; camera))
     render(device, grad, cube_parameters, primitive)
     data = collect(color, device)
-    save_test_render("colored_cube_perspective.png", data, 0x6c7bbad4635e7767)
+    save_test_render("colored_cube_perspective.png", data, 0x2a9b2f7b891b724f)
     @reset camera.focal_length = 0
     @reset camera.near_clipping_plane = -10
     @reset camera.far_clipping_plane = 10

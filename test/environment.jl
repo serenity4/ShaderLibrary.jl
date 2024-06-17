@@ -86,6 +86,6 @@
     background = renderables(env, parameters, device, Primitive(Rectangle(color, camera)))
     render(device, background)
     data = collect(color, device)
-    save_test_render("blob_background.png", data, 0xa4a6dbc1e4ea13d5)
+    save_test_render("blob_background.png", data, (0xa4a6dbc1e4ea13d5, 0x31c6ac6b43a5e783))
   end
 end;

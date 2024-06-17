@@ -105,7 +105,7 @@ function projection_scaling(camera::Camera, p)
   perspective_projection_scaling(camera, p)
 end
 
-orthogonal_projection_scaling(camera::Camera) = camera.extent ./ 2F
+orthogonal_projection_scaling(camera::Camera) = 2F ./ camera.extent
 perspective_projection_scaling(camera::Camera, p) = ntuple(_ -> camera.focal_length/p.z, 2)
 
 """
