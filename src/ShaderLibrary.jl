@@ -29,6 +29,7 @@ include("preferences.jl")
 include("camera.jl")
 include("primitive.jl")
 include("shader.jl")
+include("parsing.jl")
 include("invocation.jl")
 include("lights.jl")
 

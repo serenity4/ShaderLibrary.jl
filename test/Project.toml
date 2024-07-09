@@ -1,6 +1,7 @@
 [deps]
 Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 Erosion = "1d686ed2-f4cc-40f7-813c-2f806c81b237"
+EzXML = "8f5d6c58-4d21-5cfd-889c-e3ad7ee6a615"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 GLTF = "aeeaf58c-ab4d-11e9-3a9f-9b6bf58b5bc3"
 GeometryExperiments = "1147bd75-18e1-436d-adda-d58e854f897d"

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shaders>
+  <shader name="gradient">
+    <component name="camera-projection"/>
+    <component name="uv-vertex">
+      <data name="uv"/>
+    </component>
+    <component name="sprite">
+      <data name="texture"/>
+    </component>
+  </shader>
+
+  <shader name="quadratic-bezier-fill">
+    <component name="camera-projection"/>
+    <component name="uv-vertex">
+      <data name="uv"/>
+    </component>
+    <component name="quadratic-bezier-fill">
+      <data name="curves"/>
+      <data name="primitive_data"/>
+    </component>
+  </shader>
+
+  <shader name="pbr">
+    <component name="camera-projection"/>
+    <component name="pbr-light">
+      <data name="bsdf"/>
+      <data name="lights"/>
+    </component>
+    <component name="pbr-probe">
+      <data name="bsdf"/>
+      <data name="probes"/>
+    </component>
+    <component name="tone-mapping"/>
+    <component name="gamma-correction"/>
+  </shader>
+</shaders>

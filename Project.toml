@@ -7,6 +7,7 @@ authors = ["Cédric BELMANT"]
 Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 ColorTypes = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
 Erosion = "1d686ed2-f4cc-40f7-813c-2f806c81b237"
+EzXML = "8f5d6c58-4d21-5cfd-889c-e3ad7ee6a615"
 GLTF = "aeeaf58c-ab4d-11e9-3a9f-9b6bf58b5bc3"
 GeometryExperiments = "1147bd75-18e1-436d-adda-d58e854f897d"
 GridHelpers = "b96441d5-4525-4e55-9909-ccff87bff6f6"
@@ -22,6 +23,8 @@ StructEquality = "6ec83bb0-ed9f-11e9-3b4c-2b04cb4e219c"
 StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 
 [compat]
+Accessors = "0.1.36"
+EzXML = "1.2.0"
 GeometryExperiments = "0.4"
 Preferences = "1.4.3"
 StyledStrings = "1.11.0"

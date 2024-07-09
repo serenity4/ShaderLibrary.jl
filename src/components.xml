@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shader-components>
+  <shader-component name="camera-projection">
+    <vertex>
+      <data name="data" type="InvocationData" category="invocation-data"/>
+      <data name="position" type="Vec3" category="vertex-location"/>
+      <output builtin="Position"/>
+      <code> Position.xyz = world_to_coordinates(position, data) </code>
+    </vertex>
+  </shader-component>
+
+  <shader-component name="uv-vertex">
+    <vertex>
+      <output name="uv" type="Vec2" category="vertex-data" export="uv"/>
+    </vertex>
+  </shader-component>
+
+  <shader-component name="gradient">
+    <vertex>
+      <output name="color" type="Vec3" category="vertex-data"/>
+    </vertex>
+    <fragment>
+      <input name="color"/>
+      <output builtin="FragCoord"/>
+      <code> FragCoord.rgb = in_color </code>
+    </fragment>
+  </shader-component>
+
+  <shader-component name="tone-mapping">
+    <fragment>
+      <output builtin="FragCoord"/>
+      <code> FragCoord.rgb = hdr_tone_mapping(FragCoord.rgb) </code>
+    </fragment>
+  </shader-component>
+
+  <shader-component name="gamma-correction">
+    <fragment>
+      <data name="γ" type="Float32" default="2.2"/>
+      <output builtin="FragCoord"/>
+      <code> FragCoord.rgb = gamma_corrected(FragCoord.rgb, γ) </code>
+    </fragment>
+  </shader-component>
+
+  <shader-component name="sprite">
+    <fragment>
+      <data name="texture" type="Texture"/>
+      <input name="uv" type="Vec2"/>
+      <output builtin="FragCoord"/>
+      <code> FragCoord.rgb = texture(uv).rgb </code>
+    </fragment>
+  </shader-component>
+
+  <shader-component name="quadratic-bezier-fill">
+    <fragment>
+      <data name="curves" type="Vector{Arr{3, Vec2}}"/>
+      <data name="primitive_data" type="QuadraticBezierPrimitiveData" category="primitive-data"/>
+      <output builtin="FragCoord"/>
+      <code>
+        (; color, range, sharpness) = primitive_data
+        curves_start = DeviceAddress(UInt64(curves) + 24*(first(range) - 1U))
+        curves = PhysicalBuffer{Arr{3,Vec2}}(length(range), curves_start)
+        FragCoord.rgb = color
+        FragCoord.a = clamp(intensity(uv, curves, range, 10sharpness), 0F, 1F)
+      </code>
+    </fragment>
+  </shader-component>
+
+  <shader-component name="pbr-light">
+    <vertex>
+      <output name="normal" category="vertex-normal"/>
+      <output name="position" category="vertex-location"/>
+    </vertex>
+    <fragment>
+      <input name="normal"/>
+      <input name="position"/>
+      <data name="camera" category="camera"/>
+      <data name="bsdf" type="BSDF"/>
+      <data name="lights" type="Vector{Light}"/>
+      <code>
+        FragCoord.rgb += compute_lighting_from_sources(bsdf, lights, position, normal, camera)
+      </code>
+    </fragment>
+  </shader-component>
+
+  <shader-component name="pbr-probe">
+    <vertex>
+      <output name="normal" category="vertex-normal"/>
+      <output name="position" category="vertex-location"/>
+    </vertex>
+    <fragment>
+      <input name="normal"/>
+      <input name="position"/>
+      <data name="camera" category="camera"/>
+      <data name="bsdf" type="BSDF"/>
+      <data name="probes" type="Vector{LightProbe}"/>
+      <code>
+        FragCoord.rgb += compute_lighting_from_probes(bsdf, probes, position, normal, camera)
+      </code>
+    </fragment>
+  </shader-component>
+
+  <types>
+    <struct name="QuadraticBezierPrimitiveData">
+      <member name="range" type="UnitRange{UInt32}"/>
+      <member name="sharpness" type="Float32"/>
+      <member name="color" type="Vec3"/>
+    </struct>
+
+    <struct name="BSDF">
+      <member name="albedo" type="Vec3"/>
+      <member name="metallic" type="Float32"/>
+      <member name="roughness" type="Float32"/>
+      <member name="reflectance" type="Float32"/>
+    </struct>
+
+    <enum name="LightType" type="UInt32">
+      <member name="LIGHT_TYPE_POINT" value="1"/>
+      <member name="LIGHT_TYPE_SPOT" value="2"/>
+      <member name="LIGHT_TYPE_DIRECTION" value="3"/>
+    </enum>
+
+    <struct name="Light">
+      <member name="type" type="LightType"/>
+      <member name="position" type="Vec3"/>
+      <member name="color" type="Vec3"/>
+      <member name="intensity" type="Float32"/>
+    </struct>
+
+    <struct name="LightProbe">
+      <member name="irradiance" type="Texture"/>
+      <member name="prefiltered_environment" type="Texture"/>
+      <member name="brdf_integration_map" type="Texture"/>
+      <member name="prefiltered_mip_levels" type="UInt32"/>
+    </struct>
+  </types>
+</shader-components>
