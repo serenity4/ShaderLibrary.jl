@@ -49,7 +49,7 @@
     pbr = PBR(bsdf, lights)
     render(device, pbr, pbr_parameters, primitive)
     data = collect(color, device)
-    save_test_render("shaded_blob_pbr.png", data, (0xe3ca002e58aa947d, 0x09d3abc544b98773))
+    save_test_render("shaded_blob_pbr.png", data, 0x4a2cb75b7bc83a4f)
   end
 
   @testset "Image-based lighting" begin

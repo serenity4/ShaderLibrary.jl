@@ -31,8 +31,6 @@ include("primitive.jl")
 include("shader.jl")
 include("invocation.jl")
 include("lights.jl")
-include("environment.jl")
-include("ibl.jl")
 
 include("library/gradient.jl")
 include("library/rectangle.jl")
@@ -44,6 +42,13 @@ include("library/text.jl")
 include("library/pbr.jl")
 include("library/erosion.jl")
 include("library/gamma_correction.jl")
+include("library/environment.jl")
+include("library/ibl_irradiance.jl")
+include("library/ibl_prefilter.jl")
+include("library/ibl_brdf_integration.jl")
+
+include("cubemap.jl")
+include("ibl.jl")
 
 include("gltf.jl")
 
