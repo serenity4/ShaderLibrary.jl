@@ -7,7 +7,7 @@
     shader = GammaCorrection(image)
     compute(device, shader, ShaderParameters(), (64, 64, 1))
     data = collect(shader.color, device)
-    save_test_render("gamma_correction.png", data, 0x8d49934fbbfc0415)
+    save_test_render("gamma_correction.png", data, 0x27e9f0ff2d1cdf12)
   end
 
   @testset "Gaussian blur" begin
@@ -17,13 +17,13 @@
     shader = GaussianBlurDirectionalComp{RGBA{Float16}}(source, destination, BLUR_HORIZONTAL, 8)
     compute(device, shader, ShaderParameters(), (64, 64, 1))
     data = collect(shader.destination, device)
-    save_test_render("gaussian_blur_vertical.png", data, 0xc8166f239f343c36)
+    save_test_render("gaussian_blur_vertical.png", data, 0x695881f9d0a08c2c)
 
     destination = similar(source; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
     shader = GaussianBlurComp{RGBA{Float16}}(source, destination, 8)
     compute(device, shader, ShaderParameters(), (64, 64, 1))
     data = collect(shader.destination, device)
-    save_test_render("gaussian_blur.png", data, 0xa557571a7fa011dc)
+    save_test_render("gaussian_blur.png", data, 0x448e00ba66f81552)
   end
 
   @testset "Large-scale terrain erosion" begin
