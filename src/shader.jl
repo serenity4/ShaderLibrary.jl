@@ -103,12 +103,5 @@ function Command(cache::ProgramCache, shader::ComputeShaderComponent, parameters
   )
 end
 
-linearize_index((x, y, z), (nx, ny, nz)) = x + y * nx + z * nx * ny
-function linearize_index(global_id, global_size, local_id, local_size)
-  linearize_index(local_id, local_size) + foldl(*, local_size) * linearize_index(global_id, global_size)
-end
-
-image_index(linear_index, (ni, nj)) = (linear_index % ni, linear_index ÷ ni)
-
 render(device, shader::GraphicsShaderComponent, parameters::ShaderParameters, args...) = render(device, renderables(shader, parameters, device, args...))
 compute(device, shader::ComputeShaderComponent, parameters::ShaderParameters, args...) = render(device, renderables(shader, parameters, device, args...))

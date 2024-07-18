@@ -1,15 +1,5 @@
+# XXX: There are race conditions are only small portions of the image are covered, probably the workgroup size isn't set right.
 @testset "Computing with compute shaders" begin
-  @testset "Index computation" begin
-    @test linearize_index((0, 0, 0), (8, 1, 1), (0, 0, 0), (8, 8, 1)) == 0
-    @test linearize_index((1, 0, 0), (8, 1, 1), (0, 0, 0), (8, 8, 1)) == 64
-    @test linearize_index((1, 0, 0), (8, 1, 1), (1, 0, 0), (8, 8, 1)) == 65
-    @test linearize_index((7, 0, 0), (8, 1, 1), (7, 7, 0), (8, 8, 1)) == 511
-
-    @test image_index(0, (20, 10)) == (0, 0)
-    @test image_index(13, (20, 10)) == (13, 0)
-    @test image_index(184, (20, 10)) == (4, 9)
-  end;
-
   @testset "Gamma correction" begin
     texture = read_texture("boid.png")
     image = image_resource(device, texture; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
@@ -47,6 +37,7 @@
     maps = ErosionMaps(drainage_image, new_drainage_image, elevation_image, new_elevation_image, uplift_image, new_uplift_image)
     model = TectonicBasedErosion(1; execution = Erosion.GPU())
     shader = LargeScaleErosion{Float32, typeof(model)}(model, maps)
+    # XXX: `image::(SPIRV.Image)[grid_point::GridPoint] = ...` throws a `MethodError`.
     @test_broken compute(device, shader, ShaderParameters(), (32, 32, 1))
   end
 end;

@@ -6,12 +6,11 @@ using Preferences
 using StaticArrays
 using Accessors: Accessors, @set, @reset, setproperties
 using ColorTypes
-using SPIRV: SPIRV, validate, U, F, image_type
+using SPIRV: SPIRV, validate, U, F, image_type, πF
 using SPIRV.MathFunctions
 using Reexport
 @reexport using GeometryExperiments
 using Lava
-using SPIRV
 using Lava: Image
 using OpenType
 using OpenType: curves, curves_normalized, Line

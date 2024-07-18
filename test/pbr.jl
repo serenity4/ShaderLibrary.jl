@@ -115,19 +115,19 @@
         bsdf = BSDF{Float32}((0.0, 0.0, 0.0), 0, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_dielectric.png", data)
+        save_test_render("shaded_blob_pbr_ibl_dielectric.png", data, 0x5e37691ab9b480de)
 
         # Metallic (black)
         bsdf = BSDF{Float32}((0.0, 0.0, 0.0), 1, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_metallic.png", data)
+        save_test_render("shaded_blob_pbr_ibl_metallic.png", data, 0xf4f460f7075d9deb)
 
         # Metallic (colored)
         bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 1, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_metallic_colored.png", data)
+        save_test_render("shaded_blob_pbr_ibl_metallic_colored.png", data, 0xf4f460f7075d9deb)
       end
 
       @testset "Specular + Diffuse" begin
@@ -135,7 +135,7 @@
         bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 0, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_dielectric_colored.png", data)
+        save_test_render("shaded_blob_pbr_ibl_dielectric_colored.png", data, 0xcb7a5dbb19c268ac)
       end
     end
   end

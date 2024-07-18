@@ -71,7 +71,7 @@ function sample_from_equirectangular(texture, direction)
   # given that there is a discontinuity along the `u` coordinate.
   # This should already be the case for most hardware,
   # but some may keep using coarse derivatives by default.
-  dx, dy = DPdxFine(uv), DPdyFine(uv)
+  dx, dy = SPIRV.DPdxFine(uv), SPIRV.DPdyFine(uv)
   texture(uv, dx, dy)
 end
 

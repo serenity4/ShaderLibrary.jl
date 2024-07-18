@@ -39,10 +39,10 @@ function gaussian_blur_directional_pixel(source, pixel, direction, radius)
   res
 end
 
-function gaussian_blur_directional_comp(::Type{T}, (; data)::PhysicalRef{GaussianBlurDirectionalCompData}, images, local_id::SVector{3,UInt32}, global_id::SVector{3,UInt32}) where {T}
+function gaussian_blur_directional_comp(::Type{T}, (; data)::PhysicalRef{GaussianBlurDirectionalCompData}, images, global_id::SVector{3,UInt32}, workgroup_size::SVector{3,UInt32}) where {T}
   source, destination = images[data.source], images[data.destination]
-  li = linearize_index(global_id, data.dispatch_size, local_id, workgroup_size(GaussianBlurDirectionalComp))
-  (i, j) = image_index(li, size(source))
+  index = linear_index(global_id, workgroup_size)
+  (i, j) = image_index(index, size(source))
   result = gaussian_blur_directional_pixel(source, SVector(i, j), data.direction, data.radius)
   if T <: RGBA
     destination[i, j] = Vec4(result..., source[i, j].a)
@@ -57,14 +57,11 @@ function Program(::Type{GaussianBlurDirectionalComp{T}}, device) where {T}
     ::Type{T},
     ::PhysicalRef{GaussianBlurDirectionalCompData}::PushConstant,
     ::Arr{512,I}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_STORAGE_IMAGE)},
-    ::SVector{3,UInt32}::Input{LocalInvocationId},
-    ::SVector{3,UInt32}::Input{WorkgroupId},
-  ) options = ComputeExecutionOptions(local_size = workgroup_size(GaussianBlurDirectionalComp))
+    ::SVector{3,UInt32}::Input{GlobalInvocationId},
+    ::SVector{3,UInt32}::Input{WorkgroupSize},
+  ) options = ComputeExecutionOptions(local_size = (8U, 8U, 1U))
   Program(comp)
 end
-
-workgroup_size(::Type{<:GaussianBlurDirectionalComp}) = (8U, 8U, 1U)
-# dispatch_size(shader::GaussianBlurDirectionalComp) = # TODO
 
 resource_dependencies(blur::GaussianBlurDirectionalComp) = @resource_dependencies begin
   @read

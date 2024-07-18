@@ -1,5 +1,5 @@
 using ShaderLibrary
-using ShaderLibrary: glyph_quads, Text, linearize_index, image_index, GaussianBlurDirectionalComp, GaussianBlurComp, spherical_uv_mapping, scatter_light_sources, compute_lighting_from_sources, BRDFIntegration, cubemap_to_world, world_to_cubemap
+using ShaderLibrary: glyph_quads, Text, linear_index, image_index, GaussianBlurDirectionalComp, GaussianBlurComp, spherical_uv_mapping, scatter_light_sources, compute_lighting_from_sources, BRDFIntegration, cubemap_to_world, world_to_cubemap
 using Test
 using GeometryExperiments: Point2, Point3f
 using Lava

@@ -10,12 +10,12 @@ struct LargeScaleErosionData{M<:TectonicBasedErosion}
   dispatch_size::NTuple{3,UInt32}
 end
 
-function large_scale_erosion_comp!(data_address::DeviceAddressBlock, images, local_id::SVector{3,UInt32}, global_id::SVector{3,UInt32}, ::Type{M}) where {M}
+function large_scale_erosion_comp!(data_address::DeviceAddressBlock, images, global_id::SVector{3,UInt32}, workgroup_size::SVector{3,UInt32}, ::Type{M}) where {M}
   data = @load data_address::LargeScaleErosionData{M}
   (; dispatch_size) = data
-  li = linearize_index(global_id, dispatch_size, local_id, workgroup_size(LargeScaleErosion))
+  index = linear_index(global_id, workgroup_size)
   (nx, ny) = data.size
-  (i, j) = image_index(li, (nx, ny))
+  (i, j) = image_index(index, (nx, ny))
   (; maps, model) = data
   maps = ErosionMaps(
     images[maps.drainage],
@@ -57,9 +57,6 @@ function simulation_dependencies(shader::LargeScaleErosion)
   end
 end
 
-workgroup_size(::Type{<:LargeScaleErosion}) = (8, 8, 1)
-# dispatch_size(shader::LargeScaleErosion) = # TODO
-
 eltype_to_image_format(::Type{Float32}) = SPIRV.ImageFormatR32f
 eltype_to_image_format(T) = SPIRV.ImageFormat(T)
 
@@ -68,10 +65,10 @@ function Program(::Type{S}, device) where {T,M,S<:LargeScaleErosion{T,M}}
   compute = @compute device large_scale_erosion_comp!(
     ::DeviceAddressBlock::PushConstant,
     ::Arr{2048,I}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)},
-    ::SVector{3,UInt32}::Input{LocalInvocationId},
-    ::SVector{3,UInt32}::Input{WorkgroupId},
+    ::SVector{3,UInt32}::Input{GlobalInvocationId},
+    ::SVector{3,UInt32}::Input{WorkgroupSize},
     ::Type{M},
-  ) options = ComputeExecutionOptions(local_size = workgroup_size(S))
+  ) options = ComputeExecutionOptions(local_size = (8, 8, 1))
   Program(compute)
 end
 
