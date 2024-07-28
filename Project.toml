@@ -21,13 +21,16 @@ SPIRV = "84138a67-b342-4d33-8200-33cfcca52eb2"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StructEquality = "6ec83bb0-ed9f-11e9-3b4c-2b04cb4e219c"
 StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
+Swizzles = "60694085-d904-4bfc-95dc-1e0e768e9359"
 
 [compat]
 Accessors = "0.1.36"
 EzXML = "1.2.0"
 GeometryExperiments = "0.4"
 Preferences = "1.4.3"
+SPIRV = "0.6"
 StyledStrings = "1.11.0"
+Swizzles = "0.3"
 julia = "1.9"
 
 [extras]

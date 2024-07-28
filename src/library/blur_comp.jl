@@ -1,6 +1,3 @@
-const BLUR_HORIZONTAL = 0
-const BLUR_VERTICAL = 1
-
 struct GaussianBlurDirectionalComp{T} <: ComputeShaderComponent
   source::Resource
   destination::Resource
@@ -18,34 +15,32 @@ struct GaussianBlurDirectionalCompData
 end
 
 function gaussian_blur_directional_pixel(source, pixel, direction, radius)
-  res = zero(Vec3)
+  color = zero(Vec3)
   image_size = size(source)
   rx, ry = Int32.(min.(ceil.(3radius .* image_size), image_size))
   if direction == BLUR_HORIZONTAL
-    for i in -rx:rx
+    @for i in -rx:rx begin
       weight = gaussian_1d(i, radius)
-      sampled = source[pixel.x + i, pixel.y]
-      color = sampled.rgb
-      res .+= color * weight
+      sampled = vec3(source[pixel.x + i, pixel.y])
+      color += sampled * weight
     end
   else
-    for j in -ry:ry
+    @for j in -ry:ry begin
       weight = gaussian_1d(j, radius)
-      sampled = source[pixel.x, pixel.y + j]
-      color = sampled.rgb
-      res .+= color * weight
+      sampled = vec3(source[pixel.x, pixel.y + j])
+      color += sampled * weight
     end
   end
-  res
+  color
 end
 
-function gaussian_blur_directional_comp(::Type{T}, (; data)::PhysicalRef{GaussianBlurDirectionalCompData}, images, global_id::SVector{3,UInt32}) where {T}
+function gaussian_blur_directional_comp(::Type{T}, (; data)::PhysicalRef{GaussianBlurDirectionalCompData}, images, global_id::Vec3U) where {T}
   source, destination = images[data.source], images[data.destination]
   (i, j) = global_id.x + 1U, global_id.y + 1U
   all(1U .< (i, j) .< size(destination)) || return
-  result = gaussian_blur_directional_pixel(source, SVector(i, j), data.direction, data.radius)
+  result = gaussian_blur_directional_pixel(source, Vec2U(i, j), data.direction, data.radius)
   if T <: RGBA
-    destination[i, j] = Vec4(result..., source[i, j].a)
+    destination[i, j] = Vec4(result..., @swizzle source[i, j].a)
   else
     destination[i, j] = result
   end
@@ -58,7 +53,7 @@ function Program(::Type{GaussianBlurDirectionalComp{T}}, device) where {T}
     ::Type{T},
     ::PhysicalRef{GaussianBlurDirectionalCompData}::PushConstant,
     ::Arr{512,I}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_STORAGE_IMAGE)},
-    ::SVector{3,UInt32}::Input{GlobalInvocationId},
+    ::Vec3U::Input{GlobalInvocationId},
   ) options = ComputeExecutionOptions(local_size = (8U, 8U, 1U))
   Program(comp)
 end

@@ -10,7 +10,7 @@ end
 IrradianceConvolution{F}(resource::Resource) where {F} = IrradianceConvolution{F}(environment_texture_cubemap(resource))
 IrradianceConvolution(resource::Resource) = IrradianceConvolution{resource.image.format}(resource)
 
-interface(shader::IrradianceConvolution) = Tuple{Vector{Point3f},Nothing,Nothing}
+interface(shader::IrradianceConvolution) = Tuple{Vector{Vec3},Nothing,Nothing}
 user_data(shader::IrradianceConvolution, ctx) = instantiate(shader.texture, ctx)
 resource_dependencies(shader::IrradianceConvolution) = @resource_dependencies begin
   @read shader.texture.image::Texture
@@ -21,7 +21,7 @@ function convolve_hemisphere(f, ::Type{T}, center, dθ, dϕ) where {T}
   nθ = 1U + (fld(πF, 2dϕ))U
   nϕ = 1U + (fld(2πF, dθ))U
   n = nθ * nϕ
-  q = Rotation(Point3f(0, 0, 1), point3(center))
+  q = Rotation(Vec3(0, 0, 1), center)
   θ = 0F
   for i in 1U:nθ
     θ += dθ
@@ -40,8 +40,8 @@ function convolve_hemisphere(f, ::Type{T}, center, dθ, dϕ) where {T}
 end
 
 function irradiance_convolution_vert(position, location, index, (; data)::PhysicalRef{InvocationData})
-  position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1], data)
-  position.z = 1
+  @swizzle position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1], data)
+  @swizzle position.z = 1
   location[] = @load data.vertex_data[index + 1]::Vec3
 end
 
@@ -52,16 +52,16 @@ function irradiance_convolution_frag(irradiance, location, (; data)::PhysicalRef
   dϕ = 0.025F
   value = convolve_hemisphere(Vec3, location, dθ, dϕ) do direction, θ, ϕ
     @inline
-    sample_from_cubemap(texture, direction).rgb .* cos(θ)
+    vec3(sample_from_cubemap(texture, direction)) .* cos(θ)
   end
-  irradiance.rgb = value .* πF
-  irradiance.a = 1F
+  @swizzle irradiance.rgb = value .* πF
+  @swizzle irradiance.a = 1F
 end
 
 function Program(::Type{IrradianceConvolution{F}}, device) where {F}
-  vert = @vertex device irradiance_convolution_vert(::Vec4::Output{Position}, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+  vert = @vertex device irradiance_convolution_vert(::Mutable{Vec4}::Output{Position}, ::Mutable{Vec3}::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device irradiance_convolution_frag(
-    ::Vec4::Output,
+    ::Mutable{Vec4}::Output,
     ::Vec3::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
     ::Arr{2048,SPIRV.SampledImage{spirv_image_type(F, Val(:cubemap))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})

@@ -6,7 +6,7 @@ end
 PrefilteredEnvironmentConvolution{F}(resource::Resource, roughness) where {F} = PrefilteredEnvironmentConvolution{F}(environment_texture_cubemap(resource), roughness)
 PrefilteredEnvironmentConvolution(resource::Resource, roughness) = PrefilteredEnvironmentConvolution{resource.image.format}(resource, roughness)
 
-interface(shader::PrefilteredEnvironmentConvolution) = Tuple{Vector{Point3f},Nothing,Nothing}
+interface(shader::PrefilteredEnvironmentConvolution) = Tuple{Vector{Vec3},Nothing,Nothing}
 user_data(shader::PrefilteredEnvironmentConvolution, ctx) = (instantiate(shader.texture, ctx), shader.roughness)
 resource_dependencies(shader::PrefilteredEnvironmentConvolution) = @resource_dependencies begin
   @read shader.texture.image::Texture
@@ -92,20 +92,21 @@ function prefiltered_environment_convolution_frag(prefiltered_color, location, (
 
     sₗ = shape_factor(normal, light_direction)
     if !iszero(sₗ)
-      value += sample_from_cubemap(environment_map, light_direction).rgb * sₗ
+      value += vec3(sample_from_cubemap(environment_map, light_direction)) * sₗ
       total_weight += sₗ
     end
   end
-  prefiltered_color.rgb = value ./ total_weight
-  prefiltered_color.a = 1F
+  @swizzle prefiltered_color.rgb = value ./ total_weight
+  @swizzle prefiltered_color.a = 1F
 end
 
+# XXX: Define and use the GLSL intrinsic in SPIRV.jl
 reflect(vec, axis) = normalize(vec - 2F * (vec ⋅ axis) * axis)
 
 function Program(::Type{PrefilteredEnvironmentConvolution{F}}, device) where {F}
-  vert = @vertex device irradiance_convolution_vert(::Vec4::Output{Position}, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+  vert = @vertex device irradiance_convolution_vert(::Mutable{Vec4}::Output{Position}, ::Mutable{Vec3}::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device prefiltered_environment_convolution_frag(
-    ::Vec4::Output,
+    ::Mutable{Vec4}::Output,
     ::Vec3::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
     ::Arr{2048,SPIRV.SampledImage{spirv_image_type(F, Val(:cubemap))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})

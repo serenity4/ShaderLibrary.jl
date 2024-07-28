@@ -3,8 +3,8 @@ struct BRDFIntegration <: GraphicsShaderComponent end
 interface(shader::BRDFIntegration) = Tuple{Vector{Vec2},Nothing,Nothing}
 
 function brdf_integration_vert(position, uv, index, (; data)::PhysicalRef{InvocationData})
-  position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1], data)
-  position.z = 1
+  @swizzle position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1], data)
+  @swizzle position.z = 1
   uv[] = @load data.vertex_data[index + 1]::Vec2
 end
 
@@ -40,15 +40,13 @@ function brdf_integration_frag(color, uv, (; data)::PhysicalRef{InvocationData})
   end
   scale /= NUMBER_OF_SAMPLES
   bias /= NUMBER_OF_SAMPLES
-  color.r = scale
-  color.g = bias
-  color.a = 1F
+  color[] = Vec4(scale, bias, 0F, 1F)
 end
 
 function Program(::Type{BRDFIntegration}, device)
-  vert = @vertex device brdf_integration_vert(::Vec4::Output{Position}, ::Vec2::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+  vert = @vertex device brdf_integration_vert(::Mutable{Vec4}::Output{Position}, ::Mutable{Vec2}::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device brdf_integration_frag(
-    ::Vec4::Output,
+    ::Mutable{Vec4}::Output,
     ::Vec2::Input,
     ::PhysicalRef{InvocationData}::PushConstant
   )

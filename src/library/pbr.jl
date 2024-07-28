@@ -55,7 +55,7 @@ struct BSDF{T<:Real}
   # For metallic materials, use values with a luminosity of 67% to 100% (170-255 sRGB).
   # For non-metallic materials, values should be an sRGB value in the range 50-240 (strict range) or 30-240 (tolerant range).
   # Should be devoid of lighting information.
-  base_color::SVector{3,T}
+  base_color::Vec{3,T}
   # 0 = dielectric, 1 = metallic. Values in-between should remain close to 0 or to 1.
   metallic::T
   roughness::T # perceptual roughness
@@ -157,21 +157,22 @@ PBR{T,P}(bsdf::BSDF{T}, probes::vector_data(LightProbe)) where {T,P} = PBR{T,P}(
 PBR{T,P}(bsdf::BSDF{T}, lights::LT, probes::LP) where {T,P,LT<:vector_data(Light{T}),LP<:vector_data(LightProbe{P,Texture},LightProbe{P,DescriptorIndex})} = PBR{T,P,LT,LP}(bsdf, lights, probes)
 
 function pbr_vert(position, frag_position, frag_normal, index, (; data)::PhysicalRef{InvocationData})
-  frag_position[] = data.vertex_locations[index + 1U]
+  vertex_position = data.vertex_locations[index + 1U]
+  frag_position[] = vertex_position
   frag_normal[] = data.vertex_normals[index + 1U]
-  position.xyz = world_to_screen_coordinates(frag_position, data)
+  @swizzle position.xyz = world_to_screen_coordinates(vertex_position, data)
 end
 
 function pbr_frag(::Type{T}, color, position, normal, (; data)::PhysicalRef{InvocationData}, textures_env, textures_uv) where {T<:PBR}
   (; camera) = data
   pbr = @load data.user_data::T
-  color.rgb = compute_lighting_from_sources(pbr, position, normal, camera)
-  color.rgb += compute_lighting_from_probes(pbr, position, normal, camera, textures_env, textures_uv)
+  @swizzle color.rgb = compute_lighting_from_sources(pbr, position, normal, camera)
+  @swizzle color.rgb = @swizzle(color.rgb) + compute_lighting_from_probes(pbr, position, normal, camera, textures_env, textures_uv)
   # XXX: Perform tone-mapping and gamma correction outside of the fragment shader.
-  color.rgb = hdr_tone_mapping(color.rgb)
-  color.rgb = gamma_corrected(color.rgb)
-  color.rgb = clamp.(color.rgb, 0F, 1F)
-  color.a = 1F
+  @swizzle color.rgb = hdr_tone_mapping(@swizzle color.rgb)
+  @swizzle color.rgb = gamma_corrected(@swizzle color.rgb)
+  @swizzle color.rgb = clamp.(@swizzle(color.rgb), 0F, 1F)
+  @swizzle color.a = 1F
 end
 user_data(pbr::PBR{<:Any,P}, ctx::InvocationDataContext) where {P} = PBR(pbr.bsdf, instantiate(pbr.lights, ctx), instantiate(LightProbe{P,DescriptorIndex}, pbr.probes, ctx))
 interface(::PBR) = Tuple{Nothing, Nothing, Nothing}
@@ -186,16 +187,16 @@ function resource_dependencies(pbr::PBR)
   deps
 end
 
-function Program(::Type{<:PBR{T,P}}, device) where {T,P}
-  vert = @vertex device pbr_vert(::Vec4::Output{Position}, ::Vec3::Output, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+function Program(::Type{<:PBR{T,P,LT,LP}}, device) where {T,P,LT,PT,LP<:Vector{<:LightProbe{PT}}}
+  vert = @vertex device pbr_vert(::Mutable{Vec4}::Output{Position}, ::Mutable{Vec3}::Output, ::Mutable{Vec3}::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device pbr_frag(
     ::Type{PBR{T,P,PhysicalBuffer{Light{T}},PhysicalBuffer{LightProbe{P,DescriptorIndex}}}},
-    ::Vec4::Output,
-    ::Point3f::Input,
-    ::SVector{3,Float32}::Input,
+    ::Mutable{Vec4}::Output,
+    ::Vec3::Input,
+    ::Vec3::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
-    ::Arr{2048,SPIRV.SampledImage{spirv_image_type(Vk.Format(T), Val(:cubemap))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)},
-    ::Arr{2048,SPIRV.SampledImage{spirv_image_type(Vk.Format(T))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)},
+    ::Arr{2048,SPIRV.SampledImage{spirv_image_type(Vk.Format(PT), Val(:cubemap))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)},
+    ::Arr{2048,SPIRV.SampledImage{spirv_image_type(Vk.Format(Vec2))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)},
   )
   Program(vert, frag)
 end
@@ -299,13 +300,13 @@ function compute_lighting_from_probe(bsdf::BSDF{T}, probe::LightProbe{P}, normal
   kₛ = surface_reflection_ibl(shape_factor(normal, view), f₀, α)
   kd = one(T) .- kₛ
   kd *= 1F - bsdf.metallic
-  irradiance = point3(sample_from_cubemap(irradiance, normal).rgb)
+  irradiance = vec3(sample_from_cubemap(irradiance, normal))
   diffuse = bsdf.base_color .* irradiance
   lod = select_mip_level_from_roughness(probe, α)
   reflection = reflect(-view, normal)
-  prefiltered_color = point3(sample_from_cubemap(prefiltered_environment, reflection, lod).rgb)
+  prefiltered_color = vec3(sample_from_cubemap(prefiltered_environment, reflection, lod))
   uv = Vec2(shape_factor(normal, view), α)
-  scale, bias = brdf_integration_map(uv).rg
+  scale, bias = brdf_integration_map(uv)
   specular = prefiltered_color * (kₛ .* scale .+ bias)
   brdf = kd .* diffuse .+ specular
   btdf = one(T)

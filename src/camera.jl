@@ -65,11 +65,10 @@ The following transformations are performed on the point:
 
 A focal length of zero (default) is taken to perform orthographic projections, while a nonzero focal length will be taken to perform perspective projections.
 """
-function project(p::Point3f, camera::Camera)
+function project(p::Vec3, camera::Camera)
   isorthogonal(camera) && return orthogonal_projection(p, camera)
   perspective_projection(p, camera)
 end
-project(p::Vec3, camera::Camera) = vec3(project(point3(p), camera))
 
 """
 Assuming the camera is rotated 180° in the ZY plane, perform the inverse rotation.
@@ -77,18 +76,18 @@ Assuming the camera is rotated 180° in the ZY plane, perform the inverse rotati
 This hardcoded transform allows to use an +X right, +Y up right-handed coordinate system,
 along with a positive depth value. Without this transform, either +X right/+Y down must be used, or the computed Z value results in an opposite of the depth, which is not as convenient for graphics APIs.
 """
-apply_fixed_camera_transform_inverse(p::Point3f) = Point3f(p.x, -p.y, -p.z)
+apply_fixed_camera_transform_inverse(p::Vec3) = Vec3(p.x, -p.y, -p.z)
 
 """
 Perform the perspective projection of `p` through the `camera`.
 """
-function perspective_projection(p::Point3f, camera::Camera)
+function perspective_projection(p::Vec3, camera::Camera)
   # 3D world space -> camera local space.
   p = apply_transform_inverse(p, camera.transform)
   p = apply_fixed_camera_transform_inverse(p)
   depth = remap(p.z, camera.near_clipping_plane, camera.far_clipping_plane, 0F, 1F)
   sx, sy = perspective_projection_scaling(camera, p)
-  p′ = Point3f(p.x * sx, p.y * sy, depth)
+  p′ = Vec3(p.x * sx, p.y * sy, depth)
   project_onto_sensor(p′, camera)
 end
 
@@ -97,7 +96,7 @@ function project_onto_sensor(p, camera::Camera)
   ar = aspect_ratio(camera)
   limit = ifelse(ar ≥ 1, sensor_size[2], sensor_size[1])
   magnify = remap(-limit/2F, limit/2F, -1F, 1F)
-  Point3f(magnify(p.x), magnify(p.y), p.z)
+  Vec3(magnify(p.x), magnify(p.y), p.z)
 end
 
 function projection_scaling(camera::Camera, p)
@@ -111,7 +110,7 @@ perspective_projection_scaling(camera::Camera, p) = ntuple(_ -> camera.focal_len
 """
 Perform the orthogonal projection of `p` through the `camera`.
 """
-function orthogonal_projection(p::Point3f, camera::Camera)
+function orthogonal_projection(p::Vec3, camera::Camera)
   # 3D world space -> camera local space.
   # Only the rotation and scaling are applied, as the orthogonal projection
   # is invariant with respect to camera translation.

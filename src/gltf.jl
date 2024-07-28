@@ -68,11 +68,11 @@ end
 
 function Light{Float32}(gltf::GLTF.Object, node::GLTF.Node)
   tr = import_transform(node)
-  position = apply_transform(zero(Point3f), tr)
+  position = apply_transform(zero(Vec3), tr)
   i = node.extensions["KHR_lights_punctual"]["light"]
   light = gltf.extensions["KHR_lights_punctual"]["lights"][i + 1]
   type = light_type(light["type"])
-  color = Point3f(light["color"])
+  color = Vec3(light["color"])
   intensity = light["intensity"]
   Light{Float32}(type, position, color, intensity)
 end

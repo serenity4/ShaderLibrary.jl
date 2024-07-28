@@ -6,17 +6,17 @@ end
 
 struct Light{T}
   type::LightType
-  position::Point{3,T}
-  color::SVector{3,T}
+  position::Vec{3,T}
+  color::Vec{3,T}
   intensity::T
 end
 
-function radiance(light::Light{T}, at::Point{3}) where {T}
+function radiance(light::Light{T}, at::Vec{3}) where {T}
   if light.type == LIGHT_TYPE_POINT
-    d² = distance2(at, light.position)
+    d² = norm(at - light.position)^2
     attenuation = light.intensity / d²
     light.color .* attenuation
   else
-    zero(SVector{3,T})
+    zero(Vec{3,T})
   end
 end

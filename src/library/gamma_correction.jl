@@ -11,11 +11,12 @@ struct GammaCorrectionData
   dispatch_size::NTuple{3,UInt32}
 end
 
-function gamma_correction_comp((; data)::PhysicalRef{GammaCorrectionData}, images, global_id::SVector{3,UInt32})
+function gamma_correction_comp((; data)::PhysicalRef{GammaCorrectionData}, images, global_id::Vec3U)
   color = images[data.image]
   (i, j) = global_id.x + 1U, global_id.y + 1U
   all(1U .< (i, j) .< data.size) || return
-  color[i, j] = Vec4(gamma_corrected(color[i, j].rgb, data.factor)..., color[i, j].a)
+  pixel = color[i, j]
+  color[i, j] = Vec4(gamma_corrected(@swizzle(pixel.rgb), data.factor)..., @swizzle pixel.a)
   nothing
 end
 
@@ -24,7 +25,7 @@ function Program(::Type{GammaCorrection}, device)
   comp = @compute device gamma_correction_comp(
     ::PhysicalRef{GammaCorrectionData}::PushConstant,
     ::Arr{512,I}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_STORAGE_IMAGE)},
-    ::SVector{3,UInt32}::Input{GlobalInvocationId},
+    ::Vec3U::Input{GlobalInvocationId},
   ) options = ComputeExecutionOptions(local_size = (8U, 8U, 1U))
   Program(comp)
 end

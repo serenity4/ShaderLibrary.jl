@@ -10,11 +10,11 @@
     p′ = project(p, camera)
     @test isa(p′, Vec3)
     @test camera.near_clipping_plane < -p′.z < camera.far_clipping_plane
-    p.z = -camera.near_clipping_plane
+    @reset p.z = -camera.near_clipping_plane
     @test project(p, camera).z == 0
-    p.z = -camera.far_clipping_plane
+    @reset p.z = -camera.far_clipping_plane
     @test project(p, camera).z == 1
-    p.z = -(camera.near_clipping_plane + camera.far_clipping_plane) / 2
+    @reset p.z = -(camera.near_clipping_plane + camera.far_clipping_plane) / 2
     @test project(p, camera).z == 0.5
 
     ir = @compile project(::Vec3, ::Camera)
@@ -24,9 +24,9 @@
   @testset "Lights" begin
     light = Light{Float32}(LIGHT_TYPE_POINT, (1.0, 1.0, 1.0), (0.8, 0.8, 0.8), 1000.0)
     normal = normalize(light.position) # full incidence
-    position = zero(Point3f)
+    position = zero(Vec3)
     value = ShaderLibrary.radiance(light, position)
-    @test isa(value, Point3f)
+    @test isa(value, Vec3)
     @test all(value .> 0)
   end
 
@@ -62,7 +62,7 @@
     @test length(lights) == 1
     light = lights[1]
     @test isa(light, Light)
-    @test light.position === Point3f(4.0256276, 0.28052378, 4.5642242)
+    @test light.position === Vec3(4.0256276, 0.28052378, 4.5642242)
 
     mesh = import_mesh(gltf)
     @test nv(mesh) == 8249

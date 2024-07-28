@@ -149,28 +149,18 @@ aspect_ratio(r::Resource) = aspect_ratio(dimensions(r.data::Union{Image, Logical
 aspect_ratio(dims) = Float32(dims[1] / dims[2])
 aspect_ratio(::Nothing) = error("Dimensions must be specified for the reference attachment.")
 
-point2(x) = convert(Point2f, x)
-point3(x::Point{2}) = Point{3,eltype(x)}(x..., 0)
-point3(x) = convert(Point3f, x)
-point3(x::Point{3}) = x
-point4(x::Point{3}) = Point{4,eltype(x)}(x..., 1)
-point4(x::Point{4}) = x
-point4(x) = convert(Point4f, x)
-
-vec3(x::Vec3) = x
-vec3(x::Tuple) = vec3(Point(x))
+vec2(x) = convert(Vec2, x)
+vec2(x::Vec{3}) = @swizzle x.xy
+vec2(x::Vec{4}) = @swizzle x.xy
 vec3(x) = convert(Vec3, x)
 vec3(x::Vec{2}) = Vec3(x..., 0)
-vec3(x::Point{2}) = Vec3(x..., 0)
-vec3(x::Point{3}) = Vec3(x...)
+vec3(x::Vec{4}) = @swizzle x.xyz
 vec4(x::Vec{3}) = Vec4(x..., 1)
-vec4(x::Point{3}) = Vec4(x..., 1)
 vec4(x) = convert(Vec4, x)
-vec4(x, y, zs...) = vec4(Vec(x, y, zs...))
 
 world_to_screen_coordinates(position, data::InvocationData) = world_to_screen_coordinates(position, data.camera, data.aspect_ratio)
 function world_to_screen_coordinates(position, camera::Camera, aspect_ratio)
   position = project(position, camera)
-  position.xy = device_coordinates(position.xy, aspect_ratio)
-  position
+  xy = device_coordinates(@swizzle(position.xy), aspect_ratio)
+  Vec3(xy..., position.z)
 end

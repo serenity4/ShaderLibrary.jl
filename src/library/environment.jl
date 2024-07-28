@@ -23,14 +23,14 @@ end
 
 Accessors.constructorof(::Type{Environment{T,E}}) where {T,E} = Environment{T,E}
 
-interface(env::Environment) = Tuple{Vector{Point3f},Nothing,Nothing}
+interface(env::Environment) = Tuple{Vector{Vec3},Nothing,Nothing}
 user_data(env::Environment, ctx) = instantiate(env.texture, ctx)
 resource_dependencies(env::Environment) = @resource_dependencies begin
   @read env.texture.image::Texture
 end
 
 function environment_vert(position, direction, index, (; data)::PhysicalRef{InvocationData})
-  position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1U], data)
+  @swizzle position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1U], data)
   # Give it a maximum depth value to make sure the environment stays in the background.
   position.z = 1
   # Rely on the built-in interpolation to generate suitable directions for all fragments.
@@ -42,8 +42,8 @@ end
 function environment_frag(::Type{V}, color, direction, (; data)::PhysicalRef{InvocationData}, textures) where {V<:Val}
   texture_index = @load data.user_data::DescriptorIndex
   texture = textures[texture_index]
-  color.rgb = sample_along_direction(V(), texture, direction)
-  color.a = 1F
+  @swizzle color.rgb = sample_along_direction(V(), texture, direction)
+  @swizzle color.a = 1F
 end
 
 sample_along_direction(::Val{:cubemap}, texture, direction) = sample_from_cubemap(texture, direction)
@@ -92,10 +92,10 @@ function spherical_uv_mapping(direction)
 end
 
 function Program(::Type{Environment{T,E}}, device) where {T,E}
-  vert = @vertex device environment_vert(::Vec4::Output{Position}, ::Vec3::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+  vert = @vertex device environment_vert(::Mutable{Vec4}::Output{Position}, ::Mutable{Vec3}::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device environment_frag(
     ::Type{Val{E}},
-    ::Vec4::Output,
+    ::Mutable{Vec4}::Output,
     ::Vec3::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
     ::Arr{2048,SPIRV.SampledImage{spirv_image_type(T, Val(E))}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})

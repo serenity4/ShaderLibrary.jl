@@ -1,7 +1,7 @@
 @testset "Rendering" begin
   @testset "Triangle" begin
     grad = Gradient()
-    vertex_locations = Point2f[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]
+    vertex_locations = Vec2[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]
     vertex_data = Vec3[(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)]
     mesh = VertexMesh(1:3, vertex_locations; vertex_data)
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
@@ -14,8 +14,8 @@
 
   @testset "Rectangle" begin
     grad = Gradient()
-    rect = Rectangle(Point2(0.5, 0.5), fill(Vec3(1.0, 0.0, 1.0), 4), nothing) # actually a square
-    primitive = Primitive(rect, Point2(-0.4, -0.4))
+    rect = Rectangle(Vec2(0.5, 0.5), fill(Vec3(1.0, 0.0, 1.0), 4), nothing) # actually a square
+    primitive = Primitive(rect, Vec2(-0.4, -0.4))
     render(device, grad, parameters, primitive)
     data = collect(color, device)
     save_test_render("rectangle.png", data, 0xe0c150b540769d0b)
@@ -23,7 +23,7 @@
 
   @testset "Sprites" begin
     texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT)
-    vertex_locations = Point2f[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]
+    vertex_locations = Vec2[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]
     uvs = Vec2[(0.0, 1.0), (1.0, 1.0), (0.5, 0.0)]
     mesh = VertexMesh(1:3, vertex_locations; vertex_data = uvs)
     sprite = Sprite(texture)
@@ -49,7 +49,7 @@
     qbf = QuadraticBezierFill(curves)
     data = QuadraticBezierPrimitiveData(eachindex(curves), 3.6, Vec3(0.6, 0.4, 1.0))
     uvs = Vec2[(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)]
-    rect = Rectangle(Point2(0.5, 0.5), uvs, data)
+    rect = Rectangle(Vec2(0.5, 0.5), uvs, data)
     primitive = Primitive(rect)
     render(device, qbf, parameters, primitive)
     data = collect(color, device)
@@ -86,7 +86,7 @@
     text = OpenType.Text("The brown fox jumps over the lazy dog.", TextOptions())
     line = only(lines(text, [font => options]))
     segment = only(line.segments)
-    (; quads, curves) = glyph_quads(line, segment, zero(Point3f))
+    (; quads, curves) = glyph_quads(line, segment, zero(Vec3))
     @test length(quads) == count(!isspace, text.chars)
     @test length(unique(rect.data.range for rect in quads)) == length(line.outlines)
 

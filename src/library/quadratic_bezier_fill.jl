@@ -56,23 +56,23 @@ struct QuadraticBezierPrimitiveData
   color::Vec3
 end
 
-function quadratic_bezier_fill_vert(position, uv, frag_primitive_index::Vec{2,UInt32}, index, (; data)::PhysicalRef{InvocationData})
-  position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1U], data)
+function quadratic_bezier_fill_vert(position, uv, frag_primitive_index, index, (; data)::PhysicalRef{InvocationData})
+  @swizzle position.xyz = world_to_screen_coordinates(data.vertex_locations[index + 1U], data)
   uv[] = @load data.vertex_data[index + 1U]::Vec2
-  frag_primitive_index.x = @load data.primitive_indices[index + 1U]::UInt32
+  @swizzle frag_primitive_index.x = @load data.primitive_indices[index + 1U]::UInt32
 end
 
 function quadratic_bezier_fill_frag(out_color, uv, primitive_index, (; data)::PhysicalRef{InvocationData})
   (; color, range, sharpness) = @load data.primitive_data[primitive_index.x]::QuadraticBezierPrimitiveData
   curves_start = DeviceAddress(UInt64(data.user_data) + 24*(first(range) - 1U))
   curves = PhysicalBuffer{Arr{3,Vec2}}(length(range), curves_start)
-  out_color.rgb = color
-  out_color.a = clamp(intensity(uv, curves, range, 10sharpness), 0F, 1F)
+  @swizzle out_color.rgb = color
+  @swizzle out_color.a = clamp(intensity(uv, curves, range, 10sharpness), 0F, 1F)
 end
 
 function Program(::Type{QuadraticBezierFill}, device)
-  vert = @vertex device quadratic_bezier_fill_vert(::Vec4::Output{Position}, ::Vec2::Output, ::Vec{2,UInt32}::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
-  frag = @fragment device quadratic_bezier_fill_frag(::Vec4::Output, ::Vec2::Input, ::SVector{2,UInt32}::Input{@Flat}, ::PhysicalRef{InvocationData}::PushConstant)
+  vert = @vertex device quadratic_bezier_fill_vert(::Mutable{Vec4}::Output{Position}, ::Mutable{Vec2}::Output, ::Mutable{Vec2U}::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+  frag = @fragment device quadratic_bezier_fill_frag(::Mutable{Vec4}::Output, ::Vec2::Input, ::Vec2U::Input{@Flat}, ::PhysicalRef{InvocationData}::PushConstant)
   Program(vert, frag)
 end
 

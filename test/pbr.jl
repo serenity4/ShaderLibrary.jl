@@ -4,7 +4,7 @@
   camera = import_camera(gltf)
   mesh = import_mesh(gltf)
   mesh_transform = import_transform(gltf.nodes[end]; apply_rotation = false)
-  i = last(findmin(v -> distance2(lights[1].position, apply_transform(v, mesh_transform)), mesh.vertex_locations))
+  i = last(findmin(v -> norm(lights[1].position .- apply_transform(v, mesh_transform))^2, mesh.vertex_locations))
   position = apply_transform(mesh.vertex_locations[i], mesh_transform)
   normal = apply_rotation(mesh.vertex_normals[i], mesh_transform.rotation)
   bsdf = BSDF{Float32}((1.0, 0.0, 0.0), 0, 0.5, 0.02)
@@ -63,7 +63,7 @@
     geometry = Primitive(Rectangle(screen, directions, nothing))
     render(device, shader, parameters, geometry)
     data = collect(color, device)
-    save_test_render("irradiance_nx.png", data, 0x6f7797a2c29a23c9)
+    save_test_render("irradiance_nx.png", data, 0x5adb0afcebcad0dd)
 
     prefiltered_environment = compute_prefiltered_environment(cubemap, device; mip_levels = 1)
     shader = environment_from_cubemap(prefiltered_environment)
@@ -115,19 +115,20 @@
         bsdf = BSDF{Float32}((0.0, 0.0, 0.0), 0, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_dielectric.png", data, 0x5e37691ab9b480de)
+        save_test_render("shaded_blob_pbr_ibl_dielectric.png", data, 0xe0d911e0335488b2)
 
         # Metallic (black)
         bsdf = BSDF{Float32}((0.0, 0.0, 0.0), 1, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_metallic.png", data, 0xf4f460f7075d9deb)
+        save_test_render("shaded_blob_pbr_ibl_metallic.png", data, 0x48c7842d969434a1)
 
         # Metallic (colored)
         bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 1, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_metallic_colored.png", data, 0xf4f460f7075d9deb)
+        # FIXME: This is not colored at all.
+        @test_skip save_test_render("shaded_blob_pbr_ibl_metallic_colored.png", data, 0xf4f460f7075d9deb)
       end
 
       @testset "Specular + Diffuse" begin

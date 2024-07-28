@@ -5,7 +5,7 @@ struct Text <: GraphicsShaderComponent
 end
 
 function renderables(cache::ProgramCache, text::Text, parameters::ShaderParameters, location)
-  location = point3(convert(Point, location))
+  location = vec3(convert(Vec, location))
   line = only(lines(text.data, [text.font => text.options]))
   segment = only(line.segments)
   (; quads, curves) = glyph_quads(line, segment, location)
@@ -25,14 +25,14 @@ function glyph_quads(line::Line, segment::LineSegment, origin::Point{3})
   for i in segment.indices
     glyph = line.glyphs[i]
     iszero(glyph) && continue
-    position = point3(line.positions[i])
+    position = vec3(line.positions[i])
     outlines = line.outlines[glyph]
     box = boundingelement(outlines)
 
     range = get!(processed_glyphs, glyph) do
       start = 1 + lastindex(curves)
       # TODO: Try to make `QuadraticBezierFill` work without such remapping.
-      transf = BoxTransform(box, Box(Point2(0, 0), Point2(1, 1)))
+      transf = BoxTransform(box, Box(Vec2(0, 0), Vec2(1, 1)))
       append!(curves, Arr{3,Vec2}.(broadcast.(Vec2 ∘ transf, outlines)))
       stop = lastindex(curves)
       start:stop

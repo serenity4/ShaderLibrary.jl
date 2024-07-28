@@ -1,5 +1,5 @@
-const BLUR_HORIZONTAL = 0
-const BLUR_VERTICAL = 1
+const BLUR_HORIZONTAL = 0U
+const BLUR_VERTICAL = 1U
 
 struct GaussianBlurDirectional <: GraphicsShaderComponent
   texture::Texture
@@ -11,41 +11,39 @@ GaussianBlurDirectional(image::Resource, direction, size = 0.01) = GaussianBlurD
 gaussian_1d(t, size) = exp(-t^2 / 2size^2) / sqrt(2 * πF * size^2)
 
 function gaussian_blur_directional(reference, uv, direction, size)
-  res = zero(Vec3)
+  color = zero(Vec3)
   imsize = Base.size(SPIRV.Image(reference), 0U)
   pixel_size = 1F ./ imsize # size of one pixel in UV coordinates.
   rx, ry = Int32.(min.(ceil.(3size .* imsize), imsize))
   if direction == BLUR_HORIZONTAL
-    for i in -rx:rx
+    @for i in -rx:rx begin
       uv_offset = Vec2(i * pixel_size[1], 0)
       weight = gaussian_1d(uv_offset.x, size) * pixel_size[1]
-      sampled = reference(uv + uv_offset)
-      color = sampled.rgb
-      res .+= color * weight
+      sampled = vec3(reference(uv + uv_offset))
+      color += sampled * weight
     end
   else
-    for j in -ry:ry
+    @for j in -ry:ry begin
       uv_offset = Vec2(0, j * pixel_size[2])
       weight = gaussian_1d(uv_offset.y, size) * pixel_size[2]
-      sampled = reference(uv + uv_offset)
-      color = sampled.rgb
-      res .+= color * weight
+      sampled = vec3(reference(uv + uv_offset))
+      color += sampled * weight
     end
   end
-  res
+  color
 end
 
 function gaussian_blur_directional_frag(color, uv, (; data)::PhysicalRef{InvocationData}, textures)
   direction, size, texture_index = @load data.user_data::Tuple{UInt32, Float32, DescriptorIndex}
   reference = textures[texture_index]
-  color.rgb = gaussian_blur_directional(reference, uv, direction, size)
-  color.a = 1F
+  @swizzle color.rgb = gaussian_blur_directional(reference, uv, direction, size)
+  @swizzle color.a = 1F
 end
 
 function Program(::Type{GaussianBlurDirectional}, device)
-  vert = @vertex device sprite_vert(::Vec4::Output{Position}, ::Vec2::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
+  vert = @vertex device sprite_vert(::Mutable{Vec4}::Output{Position}, ::Mutable{Vec2}::Output, ::UInt32::Input{VertexIndex}, ::PhysicalRef{InvocationData}::PushConstant)
   frag = @fragment device gaussian_blur_directional_frag(
-    ::Vec4::Output,
+    ::Mutable{Vec4}::Output,
     ::Vec2::Input,
     ::PhysicalRef{InvocationData}::PushConstant,
     ::Arr{2048,SPIRV.SampledImage{image_type(SPIRV.ImageFormatRgba16f, SPIRV.Dim2D, 0, false, false, 1)}}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)})
@@ -72,7 +70,7 @@ function renderables(cache::ProgramCache, blur::GaussianBlur, parameters::Shader
   # XXX: We could deduce a conservative bounding box from the radius
   # and blur this region only, instead of the whole texture.
   blur_x = GaussianBlurDirectional(blur.texture, BLUR_HORIZONTAL, blur.size)
-  uvs = Vec2.([0.5 * (1 .+ p) for p in PointSet(HyperCube{2}, Point2f)])
+  uvs = Vec2.([0.5 * (1 .+ p) for p in PointSet(HyperCube{2}, Vec2)])
   rect = Rectangle((-1, -1), (1, 1), uvs, nothing)
 
   transient_image = Resource(similar(transient_color.attachment.view.image; usage_flags = Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_SAMPLED_BIT); name = :transient_image)

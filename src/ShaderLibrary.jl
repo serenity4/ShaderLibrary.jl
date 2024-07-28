@@ -6,9 +6,10 @@ using Preferences
 using StaticArrays
 using Accessors: Accessors, @set, @reset, setproperties
 using ColorTypes
-using SPIRV: SPIRV, validate, U, F, image_type, πF
+using SPIRV: SPIRV, validate, U, F, image_type, πF, @for
 using SPIRV.MathFunctions
 using Reexport
+using Swizzles: @swizzle
 @reexport using GeometryExperiments
 using Lava
 using Lava: Image
