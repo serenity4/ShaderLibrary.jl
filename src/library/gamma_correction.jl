@@ -21,7 +21,7 @@ function gamma_correction_comp((; data)::PhysicalRef{GammaCorrectionData}, image
 end
 
 function Program(::Type{GammaCorrection}, device)
-  I = SPIRV.image_type(SPIRV.ImageFormatRgba16f, SPIRV.Dim2D, 0, false, false, 2)
+  I = spirv_image_type(Vk.Format(RGBA{Float16}), Val(:image))
   comp = @compute device gamma_correction_comp(
     ::PhysicalRef{GammaCorrectionData}::PushConstant,
     ::Arr{512,I}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_STORAGE_IMAGE)},

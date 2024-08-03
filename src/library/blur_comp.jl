@@ -48,7 +48,7 @@ function gaussian_blur_directional_comp(::Type{T}, (; data)::PhysicalRef{Gaussia
 end
 
 function Program(::Type{GaussianBlurDirectionalComp{T}}, device) where {T}
-  I = SPIRV.image_type(eltype_to_image_format(T), SPIRV.Dim2D, 0, false, false, 2)
+  I = spirv_image_type(Vk.Format(T), Val(:image))
   comp = @compute device gaussian_blur_directional_comp(
     ::Type{T},
     ::PhysicalRef{GaussianBlurDirectionalCompData}::PushConstant,

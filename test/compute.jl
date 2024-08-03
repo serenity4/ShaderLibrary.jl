@@ -1,4 +1,3 @@
-# XXX: There are race conditions are only small portions of the image are covered, probably the workgroup size isn't set right.
 @testset "Computing with compute shaders" begin
   @testset "Gamma correction" begin
     texture = read_texture("boid.png")
@@ -28,16 +27,18 @@
 
   @testset "Large-scale terrain erosion" begin
     nx, ny = (256, 256)
-    drainage_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT)
-    new_drainage_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT)
-    elevation_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT)
-    new_elevation_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT)
-    uplift_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT)
-    new_uplift_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT)
+    usage_flags = Vk.IMAGE_USAGE_TRANSFER_SRC_BIT | Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_STORAGE_BIT
+    # XXX: Actually feed some initial data to these maps.
+    drainage_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT, usage_flags)
+    new_drainage_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT, usage_flags)
+    elevation_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT, usage_flags)
+    new_elevation_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT, usage_flags)
+    uplift_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT, usage_flags)
+    new_uplift_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT, usage_flags)
     maps = ErosionMaps(drainage_image, new_drainage_image, elevation_image, new_elevation_image, uplift_image, new_uplift_image)
-    model = TectonicBasedErosion(1; execution = Erosion.GPU())
+    model = TectonicBasedErosion{GPU,Float32,UInt32}(nothing, 1; execution = Erosion.GPU())
     shader = LargeScaleErosion{Float32, typeof(model)}(model, maps)
-    # XXX: `image::(SPIRV.Image)[grid_point::GridPoint] = ...` throws a `MethodError`.
-    @test_broken compute(device, shader, ShaderParameters(), (32, 32, 1))
+    compute(device, shader, ShaderParameters(), (32, 32, 1))
+    data = collect(elevation_image, device)
   end
 end;

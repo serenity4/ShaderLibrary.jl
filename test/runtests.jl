@@ -21,10 +21,10 @@ color = color_attachment(device, [1920, 1080])
 parameters = ShaderParameters(color)
 
 @testset "ShaderLibrary.jl" begin
-    include("parsing.jl")
-    include("scene.jl")
-    include("render.jl")
-    include("environment.jl")
-    include("pbr.jl")
-    include("compute.jl")
+  include("parsing.jl")
+  include("scene.jl")
+  include("render.jl")
+  include("environment.jl")
+  include("pbr.jl")
+  include("compute.jl")
 end;

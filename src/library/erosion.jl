@@ -28,7 +28,7 @@ function large_scale_erosion_comp!(data_address::DeviceAddressBlock, images, glo
   nothing
 end
 
-function renderables(cache::ProgramCache, shader::LargeScaleErosion, invocations)
+function renderables(cache::ProgramCache, shader::LargeScaleErosion, parameters::ShaderParameters, invocations)
   prog = get!(cache, typeof(shader))
   simulation_step = compute_command(
     Dispatch(invocations...),
@@ -56,14 +56,11 @@ function simulation_dependencies(shader::LargeScaleErosion)
   end
 end
 
-eltype_to_image_format(::Type{Float32}) = SPIRV.ImageFormatR32f
-eltype_to_image_format(T) = SPIRV.ImageFormat(T)
-
 function Program(::Type{S}, device) where {T,M,S<:LargeScaleErosion{T,M}}
-  I = SPIRV.image_type(eltype_to_image_format(T), SPIRV.Dim2D, 0, false, false, 1)
+  I = spirv_image_type(Vk.Format(T), Val(:image))
   compute = @compute device large_scale_erosion_comp!(
     ::DeviceAddressBlock::PushConstant,
-    ::Arr{2048,I}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_COMBINED_IMAGE_SAMPLER)},
+    ::Arr{512,I}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_STORAGE_IMAGE)},
     ::Vec3U::Input{GlobalInvocationId},
     ::Type{M},
   ) options = ComputeExecutionOptions(local_size = (8, 8, 1))
@@ -72,16 +69,17 @@ end
 
 function ProgramInvocationData(shader::LargeScaleErosion, prog, invocations)
   (; maps) = shader
-  (nx, ny) = dimensions(maps.elevation)
+  (nx, ny) = UInt32.(dimensions(maps.elevation))
+  M = typeof(shader.model)
   @invocation_data prog begin
     maps = ErosionMaps(
-      @descriptor(maps.drainage),
-      @descriptor(maps.new_drainage),
-      @descriptor(maps.elevation),
-      @descriptor(maps.new_elevation),
-      @descriptor(maps.uplift),
-      @descriptor(maps.new_uplift),
+      @descriptor(storage_image_descriptor(maps.drainage)),
+      @descriptor(storage_image_descriptor(maps.new_drainage)),
+      @descriptor(storage_image_descriptor(maps.elevation)),
+      @descriptor(storage_image_descriptor(maps.new_elevation)),
+      @descriptor(storage_image_descriptor(maps.uplift)),
+      @descriptor(storage_image_descriptor(maps.new_uplift)),
     )
-    @block LargeScaleErosionData(maps, shader.model, (nx, ny), invocations)
+    @block LargeScaleErosionData{M}(shader.model, maps, (nx, ny), invocations)
   end
 end
