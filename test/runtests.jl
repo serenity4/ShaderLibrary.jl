@@ -6,6 +6,7 @@ using Accessors: @set, @reset, setproperties
 using SPIRV.MathFunctions
 using SPIRV: SPIRV, @compile, validate, F, U, πF, Vec2, Vec3, unwrap
 using Erosion
+using ImageTransformations: imresize
 using OpenType
 using FileIO: load, save
 using SPIRV

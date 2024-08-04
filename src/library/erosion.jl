@@ -63,7 +63,7 @@ function Program(::Type{S}, device) where {T,M,S<:LargeScaleErosion{T,M}}
     ::Arr{512,I}::UniformConstant{@DescriptorSet($GLOBAL_DESCRIPTOR_SET_INDEX), @Binding($BINDING_STORAGE_IMAGE)},
     ::Vec3U::Input{GlobalInvocationId},
     ::Type{M},
-  ) options = ComputeExecutionOptions(local_size = (8, 8, 1))
+  ) options = ComputeExecutionOptions(local_size = (32, 32, 1))
   Program(compute)
 end
 
