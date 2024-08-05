@@ -63,7 +63,7 @@
     geometry = Primitive(Rectangle(screen, directions, nothing))
     render(device, shader, parameters, geometry)
     data = collect(color, device)
-    save_test_render("irradiance_nx.png", data, 0x5adb0afcebcad0dd)
+    save_test_render("irradiance_nx.png", data, (0x5adb0afcebcad0dd, 0x6f7797a2c29a23c9))
 
     prefiltered_environment = compute_prefiltered_environment(cubemap, device; mip_levels = 1)
     shader = environment_from_cubemap(prefiltered_environment)
@@ -121,7 +121,7 @@
         bsdf = BSDF{Float32}((0.0, 0.0, 0.0), 1, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_metallic.png", data, 0x48c7842d969434a1)
+        save_test_render("shaded_blob_pbr_ibl_metallic.png", data, (0x48c7842d969434a1, 0xad3fef6e293503d9))
 
         # Metallic (colored)
         bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 1, 0.3, 0.02)
@@ -136,7 +136,7 @@
         bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 0, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_dielectric_colored.png", data, 0xcb7a5dbb19c268ac)
+        save_test_render("shaded_blob_pbr_ibl_dielectric_colored.png", data, (0xcb7a5dbb19c268ac, 0x57f512e7105dfe3e))
       end
     end
   end
