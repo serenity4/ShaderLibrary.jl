@@ -1,6 +1,6 @@
 name = "ShaderLibrary"
 uuid = "bd6f7047-4356-4127-96e0-7c076db9f2eb"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Cédric BELMANT"]
 
 [deps]
