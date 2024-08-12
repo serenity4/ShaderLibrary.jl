@@ -6,6 +6,7 @@ authors = ["Cédric BELMANT"]
 [deps]
 Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 ColorTypes = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
+CompileTraces = "92d184ee-bd0d-43d0-b768-a20943f3d1e3"
 Erosion = "1d686ed2-f4cc-40f7-813c-2f806c81b237"
 EzXML = "8f5d6c58-4d21-5cfd-889c-e3ad7ee6a615"
 GLTF = "aeeaf58c-ab4d-11e9-3a9f-9b6bf58b5bc3"
@@ -25,6 +26,7 @@ Swizzles = "60694085-d904-4bfc-95dc-1e0e768e9359"
 
 [compat]
 Accessors = "0.1.36"
+CompileTraces = "1.2.2"
 EzXML = "1.2.0"
 GeometryExperiments = "0.4"
 Preferences = "1.4.3"

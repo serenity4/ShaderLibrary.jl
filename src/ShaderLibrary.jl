@@ -53,6 +53,8 @@ include("ibl.jl")
 
 include("gltf.jl")
 
+include("precompile.jl")
+
 export
   MeshTopology,
   MESH_TOPOLOGY_TRIANGLE_LIST,
