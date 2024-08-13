@@ -37,7 +37,7 @@ Vk.FrontFace(primitives::AbstractVector{<:Primitive}) = Vk.FrontFace(primitives[
 Vk.FrontFace(instance::Instance) = Vk.FrontFace(instance.primitives)
 Vk.FrontFace(instances::AbstractVector{<:Instance}) = Vk.FrontFace(instances[begin])
 
-Vk.PrimitiveTopology(primitives::AbstractVector{<:Primitive}) = length(primitives) == 1 ? vk_primitive_topology(primitives[begin]) : Vk.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+Vk.PrimitiveTopology(primitives::AbstractVector{<:Primitive}) = length(primitives) == 1 ? Vk.PrimitiveTopology(primitives[begin]) : Vk.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
 Vk.PrimitiveTopology(instance::Instance) = Vk.PrimitiveTopology(instance.primitives)
 Vk.PrimitiveTopology(instances::AbstractVector{<:Instance}) = Vk.PrimitiveTopology(instances[begin])
 
