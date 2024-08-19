@@ -24,7 +24,7 @@
     @reset geometry.mesh.vertex_data = cubemap_to_world.(geometry.mesh.vertex_data)
     render(device, shader, parameters, geometry)
     data = collect(color, device)
-    save_test_render("environment_zp_wide.png", data, 0x46289a67db54dec4)
+    save_test_render("environment_zp_wide.png", data, 0xc8cd92c69b67a265)
   end
 
   @testset "Equirectangular map sampling and conversion to CubeMap" begin
@@ -53,7 +53,7 @@
     uv = spherical_uv_mapping(Vec3(1, 0, 1))
     @test uv == Vec2(0.5, 0.25)
 
-    hs = [0xda5bd6175ce45b76, 0xe223ea91f3d6c6f7, 0x0fb18d0041e939ca, 0x920a8c6eb4112c0e, 0x4488aec1a4eb18f4, 0x878c86875caba565]
+    hs = [0xd0462159e4ff23f0, 0x2b3a5361a4190c00, 0xb95289590525156a, 0xf8c699acf9480ee8, 0xfa63c70265a4a58f, 0x534bbcf7f4dc1be6]
     for (directions, name, h) in zip(CUBEMAP_FACE_DIRECTIONS, fieldnames(CubeMapFaces), hs)
       geometry = Primitive(Rectangle(screen, directions, nothing))
       render(device, shader, parameters_square, geometry)
@@ -86,6 +86,6 @@
     background = renderables(env, parameters, device, Primitive(Rectangle(color, camera)))
     render(device, background)
     data = collect(color, device)
-    save_test_render("blob_background.png", data, (0xa4a6dbc1e4ea13d5, 0x31c6ac6b43a5e783))
+    save_test_render("blob_background.png", data, 0x31c6ac6b43a5e783)
   end
 end;

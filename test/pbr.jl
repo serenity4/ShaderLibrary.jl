@@ -34,7 +34,7 @@
 
     render(device, pbr, pbr_parameters, primitive)
     data = collect(color, device)
-    save_test_render("shaded_cube_pbr.png", data, 0x6462f25893468519)
+    save_test_render("shaded_cube_pbr.png", data, 0x7b49b0e93277e7e2)
   end
 
   @testset "Shaded blob" begin
@@ -49,7 +49,7 @@
     pbr = PBR(bsdf, lights)
     render(device, pbr, pbr_parameters, primitive)
     data = collect(color, device)
-    save_test_render("shaded_blob_pbr.png", data, 0x4a2cb75b7bc83a4f)
+    save_test_render("shaded_blob_pbr.png", data, 0x23090afb0c2f1e8c)
   end
 
   @testset "Image-based lighting" begin
@@ -63,7 +63,7 @@
     geometry = Primitive(Rectangle(screen, directions, nothing))
     render(device, shader, parameters, geometry)
     data = collect(color, device)
-    save_test_render("irradiance_nx.png", data, (0x5adb0afcebcad0dd, 0x6f7797a2c29a23c9))
+    save_test_render("irradiance_nx.png", data, 0xf41986b4d1df647a)
 
     prefiltered_environment = compute_prefiltered_environment(cubemap, device; mip_levels = 1)
     shader = environment_from_cubemap(prefiltered_environment)
@@ -71,16 +71,16 @@
     geometry = Primitive(Rectangle(screen, directions, nothing))
     render(device, shader, parameters, geometry)
     data = collect(color, device)
-    save_test_render("prefiltered_pz_mip1.png", data, 0x11deaf2c1a86fd84)
+    save_test_render("prefiltered_pz_mip1.png", data, 0xf3c18ea625e3b900)
 
     prefiltered_environment = compute_prefiltered_environment(cubemap, device; base_resolution = 1024)
     @test prefiltered_environment.image.mip_levels > 4
     data = collect(ImageView(prefiltered_environment.image; layer_range = 5:5, mip_range = 2:2), device)
     @test size(data) == (512, 512)
-    save_test_render("prefiltered_pz_mip2.png", data, 0x19afaa4e20b9bd72)
+    save_test_render("prefiltered_pz_mip2.png", data, 0xd47755560989b377)
     data = collect(ImageView(prefiltered_environment.image; layer_range = 5:5, mip_range = 4:4), device)
     @test size(data) == (128, 128)
-    save_test_render("prefiltered_pz_mip4.png", data, 0x6607c8646b2745f9)
+    save_test_render("prefiltered_pz_mip4.png", data, 0xff651137059ce0a4)
 
     uvs = Vec2[(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)]
     shader = BRDFIntegration()
@@ -88,7 +88,7 @@
     geometry = Primitive(Rectangle(screen_box(1.0), uvs, nothing))
     render(device, shader, (@set parameters.color[1] = brdf_integration_map_color), geometry)
     data = collect(brdf_integration_map_color, device)
-    save_test_render("brdf_integration_map.png", data, 0x2fa125c4d084a5b5)
+    save_test_render("brdf_integration_map.png", data, 0xa06560cc8a5633cd)
     brdf_integration_map = Resource(brdf_integration_map_color.attachment.view.image; name = :brdf_integration_map)
 
     @testset "Shading" begin
@@ -121,7 +121,7 @@
         bsdf = BSDF{Float32}((0.0, 0.0, 0.0), 1, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_metallic.png", data, (0x48c7842d969434a1, 0xad3fef6e293503d9))
+        save_test_render("shaded_blob_pbr_ibl_metallic.png", data, 0xd01c8df1f42ce6a9)
 
         # Metallic (colored)
         bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 1, 0.3, 0.02)
@@ -136,7 +136,7 @@
         bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 0, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_dielectric_colored.png", data, (0xcb7a5dbb19c268ac, 0x57f512e7105dfe3e))
+        save_test_render("shaded_blob_pbr_ibl_dielectric_colored.png", data, 0x939f8c6324d32b02)
       end
     end
   end

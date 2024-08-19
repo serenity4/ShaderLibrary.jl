@@ -11,8 +11,8 @@ read_texture(filename) = read_png(texture_file(filename))
 save_png(filename, data) = save(filename, PermutedDimsArray(data, (2, 1)))
 read_gltf(filename) = GLTF.load(asset(filename))
 
-function color_attachment(device, dimensions)
-  color = attachment_resource(device, nothing; name = :color_target, format = RGBA{Float16}, samples = 4, usage_flags = Vk.IMAGE_USAGE_TRANSFER_SRC_BIT | Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT, dims = dimensions)
+function color_attachment(device, dimensions; samples = 1)
+  color = attachment_resource(device, nothing; name = :color_target, format = RGBA{Float16}, samples, usage_flags = Vk.IMAGE_USAGE_TRANSFER_SRC_BIT | Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT, dims = dimensions)
 end
 
 function save_render(path, data)
@@ -35,24 +35,26 @@ Should all these tests fail, a warning will be emitted with a link to a temporar
 
 If `keep = false` is provided, the provided render will be deleted after being created at a temporary location, even if it is not saved into `filename`.
 """
-function save_test_render(filename, data, h = nothing; keep = true)
+function save_test_render(filename, data::Matrix, h = nothing; keep = true)
   path = render_file(filename)
   path_tmp = tempname() * ".png"
+  save_render(path_tmp, data)
+  data = read_png(eltype(data), path_tmp)
   if isnothing(h)
-    save_render(path, data)
+    mv(path_tmp, path)
     return (path, hash(data))
   end
-  save_render(path_tmp, data)
   @test stat(path_tmp).size > 0
   h′ = hash(data)
   (success, op_success, op_failure) = isa(h, UInt) ? (h′ == h, "==", "≠") : (h′ in h, "in", "∉")
   passes_with_data_comparison = false
   if isfile(path)
-    existing = read_png(path)
+    existing = read_png(eltype(data), path)
     h′′ = hash(existing)
     existing_is_valid = h′′ == h || h′′ in h
+    passes_with_data_comparison = existing ≈ data
     if !success && existing_is_valid
-      success |= existing ≈ data
+      success |= passes_with_data_comparison
       passes_with_data_comparison = true
     end
   end

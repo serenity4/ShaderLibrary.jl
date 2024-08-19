@@ -138,6 +138,9 @@ function device_coordinates(xy, aspect_ratio)
   remap.(xy, (-xmax, -ymax), (xmax, ymax), -1F, 1F)
 end
 
+pixel_size(parameters::ShaderParameters) = pixel_size(dimensions(reference_attachment(parameters)))
+pixel_size((width, height)) = ifelse(width > height, 2/width, 2/height)
+
 """
 Compute the aspect ratio from the given dimensions, taken as the ratio `width`/`height`.
 
