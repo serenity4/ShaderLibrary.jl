@@ -140,7 +140,7 @@
 
   @testset "Text rendering" begin
     font = OpenTypeFont(font_file("juliamono-regular.ttf"));
-    options = FontOptions(ShapingOptions(tag"latn", tag"fra "), 72)
+    options = FontOptions(ShapingOptions(tag"latn", tag"fra "), 48)
     text = OpenType.Text("The brown fox jumps over the lazy dog.", TextOptions())
     line = only(lines(text, [font => options]))
     segment = only(line.segments)
@@ -153,14 +153,14 @@
 
     render(device, Text(text, font, options), parameters_ssaa, (-1, 0))
     data = collect(color, device)
-    save_test_render("text.png", data, 0x14e507a0965c3be8)
+    save_test_render("text.png", data, 0x8aa232d949de880a)
 
     font = OpenTypeFont(font_file("NotoSerifLao.ttf"));
-    options = FontOptions(ShapingOptions(tag"lao ", tag"dflt"; enabled_features = Set([tag"aalt"])), 400)
+    options = FontOptions(ShapingOptions(tag"lao ", tag"dflt"; enabled_features = Set([tag"aalt"])), 200)
     text = OpenType.Text("ກີບ ສົ \ue99\ueb5\uec9", TextOptions())
     render(device, Text(text, font, options), parameters_ssaa, (-1, 0))
     data = collect(color, device)
-    save_test_render("text_lao.png", data, 0x322fd7bd547c2a01)
+    save_test_render("text_lao.png", data, 0xead7f7a2819b944f)
   end
 
   @testset "Meshes" begin
