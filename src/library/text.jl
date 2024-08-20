@@ -44,4 +44,11 @@ function glyph_quads(line::Line, segment::LineSegment, origin::Point{3}, pixel_s
   (; quads, curves)
 end
 
+"Return the bounding box in which `text` resides, in pixels."
 GeometryExperiments.boundingelement(text::Text) = boundingelement(text.data, [text.font => text.options])
+"Return the bounding box in which `text` resides, in normalized coordinates."
+function GeometryExperiments.boundingelement(text::Text, resolution)
+  box = boundingelement(text.data, [text.font => text.options])
+  scale = pixel_size(resolution)
+  Box(box.min .* scale, box.max .* scale)
+end
