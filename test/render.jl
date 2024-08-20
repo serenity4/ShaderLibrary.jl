@@ -10,6 +10,15 @@
     render(device, command)
     data = collect(color, device)
     save_test_render("triangle.png", data, 0xe13e13a928971a82)
+
+    # This time, specify vertex locations in pixels.
+    vertex_locations = Vec2[(-40, -40), (40, -40), (0, 60)]
+    mesh = VertexMesh(1:3, vertex_locations; vertex_data)
+    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
+    command = Command(grad, (@set parameters.unit = UNIT_PIXEL), device, primitive)
+    render(device, command)
+    data = collect(color, device)
+    save_test_render("triangle.png", data, 0xd2a6f09f2469722f)
   end
 
   @testset "Rectangle" begin

@@ -109,6 +109,11 @@ export
   project,
   remap,
 
+  # Units
+  UNIT_NONE,
+  UNIT_PIXEL,
+  UNIT_METRIC,
+
   # Imports
   import_mesh,
   import_camera,

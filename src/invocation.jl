@@ -57,20 +57,22 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
   vertex_locations = Vec3[]
   vertex_normals = Vec3[]
   primitive_indices = UInt32[]
+  fac = scaling_factor(parameters)
   for instance in instances
     for (i, primitive) in enumerate(instance.primitives)
       (; mesh) = primitive
       VD !== Nothing && append!(vertex_data, mesh.vertex_data)
-      append!(vertex_locations, apply_transform(vec3(location), primitive.transform) for location in mesh.vertex_locations)
-      normals = @something(mesh.vertex_normals, Vec3(1, 0, 0) for _ in 1:nv(mesh))
-      append!(vertex_normals, apply_rotation(normal, primitive.transform.rotation) for normal in normals)
-      append!(primitive_indices, i * ones(nv(mesh)))
+      vertex_normals = @something(mesh.vertex_normals, fill(Vec3(1, 0, 0), nv(mesh)))
+      for (location, normal) in zip(mesh.vertex_locations, vertex_normals)
+        location = vec3(location) .* fac
+        push!(vertex_locations, apply_transform(location, primitive.transform))
+        push!(vertex_normals, apply_rotation(normal, primitive.transform.rotation))
+        push!(primitive_indices, i)
+      end
       PT !== Nothing && push!(primitive_data, primitive.data)
     end
     IT !== Nothing && push!(instance_data, instance.data)
   end
-
-  @assert length(vertex_locations) == length(vertex_normals)
 
   @invocation_data prog begin
     vlocs = PhysicalBuffer{Vec3}(length(vertex_locations), @address(@block vertex_locations))
@@ -84,6 +86,23 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
     ar = aspect_ratio(reference_attachment(parameters))
     @block InvocationData(vlocs, vnorms, vdata, pdata, pinds, idata, udata, parameters.camera, ar)
   end
+end
+
+apply_unit(value, unit::Unit, parameters::ShaderParameters) = value * scaling_factor(unit, parameters)
+
+scaling_factor(parameters::ShaderParameters) = scaling_factor(parameters.unit, parameters)
+function scaling_factor(unit::Unit, parameters::ShaderParameters)
+  unit === UNIT_NONE && return 1
+  unit === UNIT_PIXEL && return pixel_size(parameters)
+  unit === UNIT_METRIC && return pixels_par_millimeters(parameters) * pixel_size(parameters)
+  error("Unknown unit: $unit")
+end
+
+function pixels_par_millimeter(parameters::ShaderParameters)
+  isnothing(parameters.dpmm) && error("Dots per millimeter is missing; to use a metric unit, the millimeter equivalent of the DPI must be set in the provided `ShaderParameters`")
+  dpmm_x, dpmm_y = parameters.dpmm
+  dpmm_x == dpmm_y || error("Non-uniform DPI values are not supported at the moment")
+  dpmm_x
 end
 
 vector_data(T) = Union{<:Vector{<:T}, <:PhysicalBuffer{<:T}}

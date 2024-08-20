@@ -1,5 +1,11 @@
 abstract type ShaderComponent end
 
+@enum Unit::UInt32 begin
+  UNIT_NONE = 0
+  UNIT_PIXEL = 1
+  UNIT_METRIC = 2
+end
+
 struct ShaderParameters
   color::Vector{Resource}
   color_clear::Vector{Optional{ClearValue}}
@@ -10,9 +16,12 @@ struct ShaderParameters
   render_state::RenderState
   invocation_state::ProgramInvocationState
   camera::Camera
+  unit::Optional{Unit}
+  # Dots (pixels) per millimeters. Metric equivalent of the DPI.
+  dpmm::Optional{Vec2U}
 end
 
-ShaderParameters(color...; color_clear = [DEFAULT_CLEAR_VALUE for _ in 1:length(color)], depth = nothing, depth_clear = nothing, stencil = nothing, stencil_clear = nothing, render_state = RenderState(), invocation_state = ProgramInvocationState(), camera = Camera()) = ShaderParameters(collect(color), color_clear, depth, depth_clear, stencil, stencil_clear, render_state, invocation_state, camera)
+ShaderParameters(color...; color_clear = [DEFAULT_CLEAR_VALUE for _ in 1:length(color)], depth = nothing, depth_clear = nothing, stencil = nothing, stencil_clear = nothing, render_state = RenderState(), invocation_state = ProgramInvocationState(), camera = Camera(), unit = UNIT_NONE, dpmm = nothing) = ShaderParameters(collect(color), color_clear, depth, depth_clear, stencil, stencil_clear, render_state, invocation_state, camera, unit, dpmm)
 
 RenderTargets(parameters::ShaderParameters) = RenderTargets(parameters.color, parameters.depth, parameters.stencil)
 
