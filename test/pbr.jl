@@ -49,7 +49,7 @@
     pbr = PBR(bsdf, lights)
     render(device, pbr, pbr_parameters, primitive)
     data = collect(color, device)
-    save_test_render("shaded_blob_pbr.png", data, 0x23090afb0c2f1e8c)
+    save_test_render("shaded_blob_pbr.png", data, 0x23c941b6ad30f684)
   end
 
   @testset "Image-based lighting" begin
@@ -121,7 +121,7 @@
         bsdf = BSDF{Float32}((0.0, 0.0, 0.0), 1, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_metallic.png", data, 0xd01c8df1f42ce6a9)
+        save_test_render("shaded_blob_pbr_ibl_metallic.png", data, 0xd31fdd882b5ac52d)
 
         # Metallic (colored)
         bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 1, 0.3, 0.02)
@@ -136,7 +136,7 @@
         bsdf = BSDF{Float32}((0.9, 0.4, 1.0), 0, 0.3, 0.02)
         render_pbr_blob(bsdf)
         data = collect(color, device)
-        save_test_render("shaded_blob_pbr_ibl_dielectric_colored.png", data, 0x939f8c6324d32b02)
+        save_test_render("shaded_blob_pbr_ibl_dielectric_colored.png", data, 0x064a206104ea3be9)
       end
     end
   end

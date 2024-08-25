@@ -18,7 +18,7 @@
     command = Command(grad, (@set parameters.unit = UNIT_PIXEL), device, primitive)
     render(device, command)
     data = collect(color, device)
-    save_test_render("triangle.png", data, 0xd2a6f09f2469722f)
+    save_test_render("small_triangle.png", data, 0xd2a6f09f2469722f)
   end
 
   @testset "Rectangle" begin

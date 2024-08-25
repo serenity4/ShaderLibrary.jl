@@ -62,8 +62,8 @@ function ProgramInvocationData(shader::GraphicsShaderComponent, parameters::Shad
     for (i, primitive) in enumerate(instance.primitives)
       (; mesh) = primitive
       VD !== Nothing && append!(vertex_data, mesh.vertex_data)
-      vertex_normals = @something(mesh.vertex_normals, fill(Vec3(1, 0, 0), nv(mesh)))
-      for (location, normal) in zip(mesh.vertex_locations, vertex_normals)
+      normals = @something(mesh.vertex_normals, fill(Vec3(1, 0, 0), nv(mesh)))
+      for (location, normal) in zip(mesh.vertex_locations, normals)
         location = vec3(location) .* fac
         push!(vertex_locations, apply_transform(location, primitive.transform))
         push!(vertex_normals, apply_rotation(normal, primitive.transform.rotation))
