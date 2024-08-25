@@ -153,16 +153,24 @@
     text = OpenType.Text("The brown fox jumps over the lazy dog.", TextOptions())
     line = only(lines(text, [font => options]))
     segment = only(line.segments)
-    (; quads, curves) = glyph_quads(line, segment, zero(Vec3), pixel_size(parameters))
+    (; quads, curves) = glyph_quads(line, segment, zero(Vec3), Vec3(1, 1, 1), pixel_size(parameters))
     @test length(quads) == count(!isspace, text.chars)
     @test length(unique(rect.data.range for rect in quads)) == length(line.outlines)
+    geometry = boundingelement(Text(text, font, options))
+    @test isa(geometry, Box{2,Float64})
 
     # Enable fragment supersampling to reduce aliasing artifacts.
     parameters_ssaa = @set parameters.render_state.enable_fragment_supersampling = true
 
+    text = OpenType.Text("The brown fox jumps over the lazy dog.", TextOptions())
     render(device, Text(text, font, options), parameters_ssaa, (-1, 0))
     data = collect(color, device)
     save_test_render("text.png", data, 0x8aa232d949de880a)
+
+    text = OpenType.Text(styled"The {color=brown:brown} {underline:fox} jumps {cyan:over} the {color=purple:{strikethrough:lazy} beautiful} dog.", TextOptions())
+    render(device, Text(text, font, options), parameters_ssaa, (-1, 0))
+    data = collect(color, device)
+    save_test_render("text_rich.png", data, 0xc636c36f2684772e)
 
     font = OpenTypeFont(font_file("NotoSerifLao.ttf"));
     options = FontOptions(ShapingOptions(tag"lao ", tag"dflt"; enabled_features = Set([tag"aalt"])), 200)

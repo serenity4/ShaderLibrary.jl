@@ -41,7 +41,7 @@ function save_test_render(filename, data::Matrix, h = nothing; keep = true)
   save_render(path_tmp, data)
   data = read_png(eltype(data), path_tmp)
   if isnothing(h)
-    mv(path_tmp, path)
+    mv(path_tmp, path; force = true)
     return (path, hash(data))
   end
   @test stat(path_tmp).size > 0
@@ -60,7 +60,7 @@ function save_test_render(filename, data::Matrix, h = nothing; keep = true)
   if success
     if !passes_with_data_comparison
       isfile(path) && @assert !existing_is_valid
-      keep && @info "Updating the render file at $path"
+      keep && @info "$(isfile(path) ? "Updating" : "Creating") the render file at $path"
       mkpath(dirname(path))
       ispath(path) && rm(path)
       mv(path_tmp, path)

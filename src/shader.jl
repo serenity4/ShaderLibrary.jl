@@ -82,7 +82,7 @@ function Command(cache::ProgramCache, shader::GraphicsShaderComponent, parameter
 end
 Command(shader::ShaderComponent, parameters::ShaderParameters, device, args...) = Command(ProgramCache(device), shader, parameters, args...)
 
-const DEFAULT_CLEAR_VALUE = ClearValue((0.08, 0.05, 0.1, 1.0))
+const DEFAULT_CLEAR_VALUE = nothing
 
 interface(::ShaderComponent) = Tuple{Nothing,Nothing,Nothing}
 resource_dependencies(shader::GraphicsShaderComponent) = Lava.Dictionary{Resource,ResourceDependency}()

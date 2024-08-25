@@ -19,7 +19,7 @@ include("utils.jl")
 instance, device = init(; with_validation = true, device_specific_features = [:sample_rate_shading])
 # instance, device = init(; with_validation = true, include_gpu_assisted_validation = true)
 color = color_attachment(device, [1920, 1080]; samples = 4)
-parameters = ShaderParameters(color)
+parameters = ShaderParameters(color; color_clear = [ClearValue((0.08, 0.05, 0.1, 1.0))])
 
 @testset "ShaderLibrary.jl" begin
   include("parsing.jl")
