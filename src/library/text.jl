@@ -10,6 +10,16 @@ function renderables(cache::ProgramCache, text::Text, parameters::ShaderParamete
   commands = Command[]
   px = pixel_size(parameters)F
   no_clear = fill(nothing, length(parameters.color))
+
+  # Render backgrounds first.
+  for segment in line.segments
+    isnothing(segment.style.background) && continue
+    command = Command(cache, Gradient(), parameters, background_decoration(line, segment, location, segment.style.background, px))
+    isempty(commands) && (parameters = @set parameters.color_clear = no_clear)
+    push!(commands, command)
+  end
+
+  # Then render glyphs.
   for segment in line.segments
     isnothing(boundingelement(line, segment)) && continue
     (; r, g, b) = something(segment.style.color, RGB(1f0, 1f0, 1f0))
@@ -19,10 +29,10 @@ function renderables(cache::ProgramCache, text::Text, parameters::ShaderParamete
     command = Command(cache, qbf, parameters, quads)
     isempty(commands) && (parameters = @set parameters.color_clear = no_clear)
     push!(commands, command)
-    !segment.style.underline && !segment.style.strikethrough && continue
     segment.style.underline && push!(commands, Command(cache, Gradient(), parameters, underline_decoration(line, segment, location, color, px)))
     segment.style.strikethrough && push!(commands, Command(cache, Gradient(), parameters, strikethrough_decoration(line, segment, location, color, px)))
   end
+
   commands
 end
 
@@ -78,6 +88,21 @@ function line_decoration(line::Line, segment::LineSegment, origin::Point{3}, col
   geometry = Box(Point2f(box.min[1] * px - margin/2, -height/2), Point2f(box.max[1] * px + margin/2, height/2))
   vertex_data = fill(color, 4)
   Rectangle(geometry, vertex_data, nothing)
+end
+
+function background_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::RGBA{Float32}, px)
+  color = Vec3(color.r, color.g, color.b)
+  (; ascender, descender) = segment.font.hhea
+  ascender *= segment.style.size * px
+  descender *= segment.style.size * px
+  offset = (ascender + descender) / 2
+  position = @set origin.y += offset
+  height = ascender - descender
+  box = boundingelement(line, segment)
+  geometry = Box(Point2f(box.min[1] * px, -height/2), Point2f(box.max[1] * px, height/2))
+  vertex_data = fill(color, 4)
+  decoration = Rectangle(geometry, vertex_data, nothing)
+  Primitive(decoration, position)
 end
 
 "Return the bounding box in which `text` resides, in pixels."

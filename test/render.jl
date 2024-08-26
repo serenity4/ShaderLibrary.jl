@@ -167,10 +167,10 @@
     data = collect(color, device)
     save_test_render("text.png", data, 0x8aa232d949de880a)
 
-    text = OpenType.Text(styled"The {color=brown:brown} {underline:fo{size=30:x}}{size=108: jumps {cyan:over} }the {color=purple:{strikethrough:l{size=100:a}zy} beautiful} dog.", TextOptions())
+    text = OpenType.Text(styled"The {color=brown:brown} {underline:fo{size=30:x}}{size=108: {background=orange:jumps} {cyan:over} }the {color=purple:{strikethrough:l{size=100:a}zy} beautiful} dog.", TextOptions())
     render(device, Text(text, font, options), parameters_ssaa, (-1.7, 0))
     data = collect(color, device)
-    save_test_render("text_rich.png", data, 0x2ab07d58545c96a8)
+    save_test_render("text_rich.png", data, 0x6b6eac731a09bcb2)
 
     font = OpenTypeFont(font_file("NotoSerifLao.ttf"));
     options = FontOptions(ShapingOptions(tag"lao ", tag"dflt"; enabled_features = Set([tag"aalt"])), 200)
