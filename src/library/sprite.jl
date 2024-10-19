@@ -9,8 +9,7 @@ end
 
 function sprite_frag(color, uv, (; data)::PhysicalRef{InvocationData}, textures)
   texture_index = @load data.user_data::DescriptorIndex
-  @swizzle color.rgb = textures[texture_index](uv)
-  @swizzle color.a = 1F
+  @swizzle color.rgba = textures[texture_index](uv)
 end
 
 function Program(::Type{Sprite}, device)
