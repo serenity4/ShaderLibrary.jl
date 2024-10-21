@@ -149,11 +149,12 @@
 
   @testset "Text rendering" begin
     font = OpenTypeFont(font_file("juliamono-regular.ttf"));
-    options = FontOptions(ShapingOptions(tag"latn", tag"fra "), 48)
+    px = pixel_size(parameters)
+    options = FontOptions(ShapingOptions(tag"latn", tag"fra "), 48px)
     text = OpenType.Text("The brown fox jumps over the lazy dog.", TextOptions())
     line = only(lines(text, [font => options]))
     segment = only(line.segments)
-    (; quads, curves) = glyph_quads(line, segment, zero(Vec3), Vec3(1, 1, 1), pixel_size(parameters))
+    (; quads, curves) = glyph_quads(line, segment, zero(Vec3), Vec3(1, 1, 1))
     @test length(quads) == count(!isspace, text.chars)
     @test length(unique(rect.data.range for rect in quads)) == length(line.outlines)
     geometry = boundingelement(Text(text, font, options))
@@ -167,13 +168,13 @@
     data = collect(color, device)
     save_test_render("text.png", data, 0x8aa232d949de880a)
 
-    text = OpenType.Text(styled"The {color=brown:brown} {underline:fo{size=30:x}}{size=108: {background=orange:jumps} {cyan:over} }the {color=purple:{strikethrough:l{size=100:a}zy} beautiful} dog.", TextOptions())
+    text = OpenType.Text(styled"The {color=brown:brown} {underline:fo{size=$(30px):x}}{size=$(108px): {background=orange:jumps} {cyan:over} }the {color=purple:{strikethrough:l{size=$(100px):a}zy} beautiful} dog.", TextOptions())
     render(device, Text(text, font, options), parameters_ssaa, (-1.7, 0))
     data = collect(color, device)
     save_test_render("text_rich.png", data, 0x6b6eac731a09bcb2)
 
     font = OpenTypeFont(font_file("NotoSerifLao.ttf"));
-    options = FontOptions(ShapingOptions(tag"lao ", tag"dflt"; enabled_features = Set([tag"aalt"])), 200)
+    options = FontOptions(ShapingOptions(tag"lao ", tag"dflt"; enabled_features = Set([tag"aalt"])), 200px)
     text = OpenType.Text("ກີບ ສົ \ue99\ueb5\uec9", TextOptions())
     render(device, Text(text, font, options), parameters_ssaa, (-1, 0))
     data = collect(color, device)

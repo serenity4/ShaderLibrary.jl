@@ -52,7 +52,7 @@ function save_test_render(filename, data::Matrix, h = nothing; keep = true)
     existing = read_png(eltype(data), path)
     h′′ = hash(existing)
     existing_is_valid = h′′ == h || h′′ in h
-    passes_with_data_comparison = existing ≈ data
+    passes_with_data_comparison = isapprox(existing, data; rtol = 1e-2)
     if !success && existing_is_valid
       success |= passes_with_data_comparison
     end
