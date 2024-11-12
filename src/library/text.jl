@@ -1,21 +1,28 @@
 struct Text <: GraphicsShaderComponent
-  data::OpenType.Text
-  font::OpenTypeFont
-  options::FontOptions
+  lines::Vector{OpenType.Line}
+end
+
+Text(text::OpenType.Text, font::OpenTypeFont, options::OpenType.FontOptions) = Text(text, [font => options])
+
+function Text(text::OpenType.Text, fonts)
+  lines = OpenType.lines(text, fonts)
+  Text(lines)
 end
 
 function renderables(cache::ProgramCache, text::Text, parameters::ShaderParameters, location)
   location = vec3(convert(Vec, location))
-  line = only(lines(text.data, [text.font => text.options]))
-  commands = Command[]
+  length(text.lines) == 1 || error("Multi-line text is not supported yet")
+  line = text.lines[1]
+  background_renders = Command[]
+  text_renders = Command[]
   no_clear = fill(nothing, length(parameters.color))
 
   # Render backgrounds first.
   for segment in line.segments
     isnothing(segment.style.background) && continue
     command = Command(cache, Gradient(), parameters, background_decoration(line, segment, location, segment.style.background))
-    isempty(commands) && (parameters = @set parameters.color_clear = no_clear)
-    push!(commands, command)
+    isempty(background_renders) && (parameters = @set parameters.color_clear = no_clear)
+    push!(background_renders, command)
   end
 
   # Then render glyphs.
@@ -26,13 +33,14 @@ function renderables(cache::ProgramCache, text::Text, parameters::ShaderParamete
     (; position, quads, curves) = glyph_quads(line, segment, location, color)
     qbf = QuadraticBezierFill(curves)
     command = Command(cache, qbf, parameters, quads)
-    isempty(commands) && (parameters = @set parameters.color_clear = no_clear)
-    push!(commands, command)
-    segment.style.underline && push!(commands, Command(cache, Gradient(), parameters, underline_decoration(line, segment, location, color)))
-    segment.style.strikethrough && push!(commands, Command(cache, Gradient(), parameters, strikethrough_decoration(line, segment, location, color)))
+    isempty(text_renders) && (parameters = @set parameters.color_clear = no_clear)
+    push!(text_renders, command)
+    segment.style.underline && push!(text_renders, Command(cache, Gradient(), parameters, underline_decoration(line, segment, location, color)))
+    segment.style.strikethrough && push!(text_renders, Command(cache, Gradient(), parameters, strikethrough_decoration(line, segment, location, color)))
   end
 
-  commands
+  isempty(background_renders) && return text_renders
+  [background_renders, text_renders]
 end
 
 function glyph_quads(line::Line, segment::LineSegment, origin::Vec3, color::Vec3)
@@ -105,4 +113,4 @@ function background_decoration(line::Line, segment::LineSegment, origin::Point{3
 end
 
 "Return the bounding box in which the text resides."
-GeometryExperiments.boundingelement(text::Text) = boundingelement(text.data, [text.font => text.options])
+GeometryExperiments.boundingelement(text::Text) = boundingelement(text.lines)

@@ -11,6 +11,7 @@ using OpenType
 using FileIO: load, save
 using SPIRV
 using ColorTypes: AbstractRGBA
+using StyledStrings: @styled_str
 
 import GLTF
 
