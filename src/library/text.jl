@@ -27,7 +27,7 @@ function renderables(cache::ProgramCache, text::Text, parameters::ShaderParamete
 
   # Then render glyphs.
   for segment in line.segments
-    isnothing(boundingelement(line, segment)) && continue
+    has_outlines(line, segment) || continue
     (; r, g, b) = something(segment.style.color, RGB(1f0, 1f0, 1f0))
     color = Vec3(r, g, b)
     (; position, quads, curves) = glyph_quads(line, segment, location, color)
@@ -74,24 +74,23 @@ function glyph_quads(line::Line, segment::LineSegment, origin::Vec3, color::Vec3
 end
 
 function underline_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::Vec3)
-  decoration = line_decoration(line, segment, origin, color)
+  decoration = linear_decoration(line, segment, origin, color)
   offset = 200segment.style.size
   baseline = @set origin.y -= offset
   Primitive(decoration, baseline)
 end
 
 function strikethrough_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::Vec3)
-  decoration = line_decoration(line, segment, origin, color)
-  (; ascender, descender) = segment.font.hhea
-  offset = (ascender + descender) * segment.style.size / 2
-  baseline = @set origin.y += offset
-  Primitive(decoration, baseline)
+  decoration = linear_decoration(line, segment, origin, color)
+  offset = (ascender(segment) + descender(segment)) / 2
+  line_center = @set origin.y += offset
+  Primitive(decoration, line_center)
 end
 
-function line_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::Vec3)
+function linear_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::Vec3)
   height = 75segment.style.size
   margin = 75segment.style.size
-  box = boundingelement(line, segment)
+  box = segment_geometry(line, segment)
   geometry = Box(Point2f(box.min[1] - margin/2, -height/2), Point2f(box.max[1] + margin/2, height/2))
   vertex_data = fill(color, 4)
   Rectangle(geometry, vertex_data, nothing)
@@ -99,18 +98,8 @@ end
 
 function background_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::RGBA{Float32})
   color = Vec3(color.r, color.g, color.b)
-  (; ascender, descender) = segment.font.hhea
-  ascender *= segment.style.size
-  descender *= segment.style.size
-  offset = (ascender + descender) / 2
-  position = @set origin.y += offset
-  height = ascender - descender
-  box = boundingelement(line, segment)
-  geometry = Box(Point2f(box.min[1], -height/2), Point2f(box.max[1], height/2))
+  geometry = segment_geometry(line, segment)
   vertex_data = fill(color, 4)
   decoration = Rectangle(geometry, vertex_data, nothing)
-  Primitive(decoration, position)
+  Primitive(decoration, origin)
 end
-
-"Return the bounding box in which the text resides."
-GeometryExperiments.boundingelement(text::Text) = boundingelement(text.lines)

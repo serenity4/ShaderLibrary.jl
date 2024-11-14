@@ -51,6 +51,30 @@
     save_test_render("sprite_rectangle.png", data, 0x83c64ebd09e13704)
   end
 
+  @testset "Blur" begin
+    texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT, name = :normal_map)
+    vertex_locations = Vec2[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]
+    uvs = Vec2[(0.0, 1.0), (1.0, 1.0), (0.5, 0.0)]
+    mesh = VertexMesh(1:3, vertex_locations; vertex_data = uvs)
+    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
+
+    directional_blur = GaussianBlurDirectional(texture, BLUR_HORIZONTAL, 0.02)
+    render(device, directional_blur, parameters, primitive)
+    data = collect(color, device)
+    save_test_render("blurred_triangle_horizontal.png", data, 0x0676ff22a882d5f1)
+
+    directional_blur = GaussianBlurDirectional(texture, BLUR_VERTICAL, 0.02)
+    render(device, directional_blur, parameters, primitive)
+    data = collect(color, device)
+    save_test_render("blurred_triangle_vertical.png", data, 0xb38fadbdbc250416)
+
+    # Need to specify dimensions of the whole texture for the first pass.
+    blur = GaussianBlur(texture, 0.02)
+    render(device, blur, parameters, primitive)
+    data = collect(color, device)
+    save_test_render("blurred_triangle.png", data, 0xc980df4399b8e477)
+  end
+
   @testset "Glyph rendering" begin
     @testset "Alpha calculation" begin
       @testset "Winding number calculation" begin
@@ -123,30 +147,6 @@
     save_test_render("glyph_unnormalized.png", data, 0x0b7ae4fb246f7a73; keep = false)
   end
 
-  @testset "Blur" begin
-    texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT, name = :normal_map)
-    vertex_locations = Vec2[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]
-    uvs = Vec2[(0.0, 1.0), (1.0, 1.0), (0.5, 0.0)]
-    mesh = VertexMesh(1:3, vertex_locations; vertex_data = uvs)
-    primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
-
-    directional_blur = GaussianBlurDirectional(texture, BLUR_HORIZONTAL, 0.02)
-    render(device, directional_blur, parameters, primitive)
-    data = collect(color, device)
-    save_test_render("blurred_triangle_horizontal.png", data, 0x0676ff22a882d5f1)
-
-    directional_blur = GaussianBlurDirectional(texture, BLUR_VERTICAL, 0.02)
-    render(device, directional_blur, parameters, primitive)
-    data = collect(color, device)
-    save_test_render("blurred_triangle_vertical.png", data, 0xb38fadbdbc250416)
-
-    # Need to specify dimensions of the whole texture for the first pass.
-    blur = GaussianBlur(texture, 0.02)
-    render(device, blur, parameters, primitive)
-    data = collect(color, device)
-    save_test_render("blurred_triangle.png", data, 0xc980df4399b8e477)
-  end
-
   @testset "Text rendering" begin
     font = OpenTypeFont(font_file("juliamono-regular.ttf"));
     px = pixel_size(parameters)
@@ -157,8 +157,6 @@
     (; quads, curves) = glyph_quads(line, segment, zero(Vec3), Vec3(1, 1, 1))
     @test length(quads) == count(!isspace, text.chars)
     @test length(unique(rect.data.range for rect in quads)) == length(line.outlines)
-    geometry = boundingelement(Text(text, font, options))
-    @test isa(geometry, Box{2,Float64})
 
     # Enable fragment supersampling to reduce aliasing artifacts.
     parameters_ssaa = @set parameters.render_state.enable_fragment_supersampling = true
@@ -168,10 +166,10 @@
     data = collect(color, device)
     save_test_render("text.png", data, 0x8aa232d949de880a)
 
-    text = OpenType.Text(styled"The {color=brown:brown} {underline:fo{size=$(30px):x}}{size=$(108px): {background=orange:jumps} {cyan:over} }the {color=purple:{strikethrough:l{size=$(100px):a}zy} beautiful} dog.", TextOptions())
+    text = OpenType.Text(styled"The{background=red: }{color=brown:brown} {underline:fo{size=$(30px):x}}{size=$(108px): {background=orange:jumps} {cyan:over} }the {color=purple:{strikethrough:l{size=$(100px):a}zy} beautiful} dog.", TextOptions())
     render(device, Text(text, font, options), parameters_ssaa, (-1.7, 0))
     data = collect(color, device)
-    save_test_render("text_rich.png", data, 0x6b6eac731a09bcb2)
+    save_test_render("text_rich.png", data, 0xaf02396a74ffda42)
 
     font = OpenTypeFont(font_file("NotoSerifLao.ttf"));
     options = FontOptions(ShapingOptions(tag"lao ", tag"dflt"; enabled_features = Set([tag"aalt"])), 200px)
