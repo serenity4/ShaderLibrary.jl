@@ -1,6 +1,6 @@
 name = "ShaderLibrary"
 uuid = "bd6f7047-4356-4127-96e0-7c076db9f2eb"
-version = "0.1.9"
+version = "0.1.10"
 authors = ["Cédric BELMANT"]
 
 [deps]
@@ -29,6 +29,7 @@ Accessors = "0.1.36"
 CompileTraces = "1.2.2"
 EzXML = "1.2.0"
 GeometryExperiments = "0.4"
+GLTF = "0.4"
 Preferences = "1.4.3"
 SPIRV = "0.6"
 StyledStrings = "1.11.0"
