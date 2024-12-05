@@ -124,7 +124,8 @@
 
     font = OpenTypeFont(font_file("juliamono-regular.ttf"));
     glyph = font['A']
-    curves = map(x -> Arr{3,Vec2}(Vec2.(x)), OpenType.curves_normalized(glyph))
+    transform((x, y)) = Vec2(remap(x, glyph.header.xmin, glyph.header.xmax, 0, 1), remap(y, glyph.header.ymin, glyph.header.ymax, 0, 1))
+    curves = map(ps -> Arr{3,Vec2}(transform.(ps)), OpenType.curves(glyph))
     qbf = QuadraticBezierFill(curves)
     data = QuadraticBezierPrimitiveData(eachindex(curves), 0.5/pixel_size(parameters), Vec3(0.6, 0.4, 1.0))
     uvs = Vec2[(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)]
