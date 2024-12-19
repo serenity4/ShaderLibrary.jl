@@ -49,6 +49,7 @@ include("library/environment.jl")
 include("library/ibl_irradiance.jl")
 include("library/ibl_prefilter.jl")
 include("library/ibl_brdf_integration.jl")
+include("library/mipmap.jl")
 
 include("cubemap.jl")
 include("ibl.jl")
@@ -104,6 +105,7 @@ export
 
   # Compute shader components
   GammaCorrection,
+  MipmapGamma,
   LargeScaleErosion,
 
   Camera, focal_length,

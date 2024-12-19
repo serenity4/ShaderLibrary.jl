@@ -14,7 +14,7 @@ end
 function gamma_correction_comp((; data)::PhysicalRef{GammaCorrectionData}, images, global_id::Vec3U)
   color = images[data.image]
   (i, j) = global_id.x + 1U, global_id.y + 1U
-  all(1U .< (i, j) .< data.size) || return
+  all(1U .≤ (i, j) .≤ data.size) || return
   pixel = color[i, j]
   color[i, j] = Vec4(gamma_corrected(@swizzle(pixel.rgb), data.factor)..., @swizzle pixel.a)
   nothing

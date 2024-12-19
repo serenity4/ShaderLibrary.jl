@@ -6,7 +6,7 @@
     shader = GammaCorrection(image)
     compute(device, shader, ShaderParameters(), (64, 64, 1))
     data = collect(shader.color, device)
-    save_test_render("gamma_correction.png", data, 0x617bec518a4c8f33)
+    save_test_render("gamma_correction.png", data, 0x70b485a2e3edf5b9)
   end
 
   @testset "Gaussian blur" begin
@@ -16,13 +16,25 @@
     shader = GaussianBlurDirectionalComp{RGBA{Float16}}(source, destination, BLUR_HORIZONTAL, 8)
     compute(device, shader, ShaderParameters(), (64, 64, 1))
     data = collect(shader.destination, device)
-    save_test_render("gaussian_blur_vertical.png", data, 0x71d394a71cc4e9a0)
+    save_test_render("gaussian_blur_vertical.png", data, 0xd9e6eed17d68e31a)
 
     destination = similar(source; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
     shader = GaussianBlurComp{RGBA{Float16}}(source, destination, 8)
     compute(device, shader, ShaderParameters(), (64, 64, 1))
     data = collect(shader.destination, device)
-    save_test_render("gaussian_blur.png", data, 0x5fa9f3eab24ab957)
+    save_test_render("gaussian_blur.png", data, 0x24482d322565a305)
+  end
+
+  @testset "Mipmap generation" begin
+    texture = read_texture("normal.png")
+    image = image_resource(device, texture; usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
+    @test collect(image, device) == texture
+    nx, ny = size(texture)
+    mipmap = image_resource(device, fill(RGBA{Float16}(0.0, 0.0, 0.0, 1.0), nx ÷ 2, ny ÷ 2); usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT)
+    shader = MipmapGamma(image, mipmap)
+    compute(device, shader, ShaderParameters(), (64, 64, 1))
+    data = collect(shader.mipmap, device)
+    save_test_render("mipmap_gamma.png", data, 0xf371ddeeadd54ab0)
   end
 
   @testset "Large-scale terrain erosion" begin
@@ -58,6 +70,6 @@
 
     data = collect(elevation_image, device)
     data = remap.(data, extrema(data)..., 0F, 1F)
-    save_test_render("erosion.png", data, 0x5df3b3027bfaf0f8)
+    save_test_render("erosion.png", data, 0xb11688314b664975)
   end
 end;
