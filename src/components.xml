@@ -39,6 +39,40 @@
       <output builtin="FragCoord"/>
       <code> FragCoord.rgb = gamma_corrected(FragCoord.rgb, γ) </code>
     </fragment>
+    <!-- <compute>
+      <data name="γ" type="Float32" default="2.2"/>
+      <data name="invocations" type="Vec2U"/>
+      <input builtin="GlobalInvocationId"/>
+      <input-output name="image" type="Image"/>
+      XXX: Automate the bounds checking and index retrieval.
+      <code>
+        (i, j) = GlobalInvocationId.x + 1U, GlobalInvocationId.y + 1U
+        all(1U .&lt; (i, j) .&lt; invocations) || return
+        pixel = image[i, j]
+        image[i, j] = Vec4(gamma_corrected(@swizzle(pixel.rgb), γ)..., @swizzle pixel.a)
+      </code>
+    </compute> -->
+  </shader-component>
+
+  <shader-component name="generate-mipmaps">
+    <compute>
+      <input builtin="GlobalInvocationId"/>
+      <input name="image" type="Image"/>
+      <output name="mipmap" type="Image"/>
+      <data name="invocations" type="Vec2U"/>
+      <code>
+        <!-- XXX: Automate the bounds checking and index retrieval. -->
+        (i, j) = GlobalInvocationId.x + 1U, GlobalInvocationId.y + 1U
+        all(1U .&lt; (i, j) .&lt; invocations) || return
+        k = (2U)i
+        l = (2U)j
+        a = image[k, l]
+        b = image[k + 1U, l]
+        c = image[k, l + 1U]
+        d = image[k + 1U, l + 1U]
+        mipmap[i, j] = sqrt(a^2 + b^2 + c^2 + d^2) / 4F
+      </code>
+    </compute>
   </shader-component>
 
   <shader-component name="sprite">
@@ -46,7 +80,7 @@
       <data name="texture" type="Texture"/>
       <input name="uv" type="Vec2"/>
       <output builtin="FragCoord"/>
-      <code> FragCoord.rgb = texture(uv).rgb </code>
+      <code> FragCoord[] = texture(uv) </code>
     </fragment>
   </shader-component>
 

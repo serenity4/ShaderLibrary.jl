@@ -20,6 +20,8 @@ using Erosion: ErosionMaps
 using StructEquality: @struct_hash_equal, @struct_hash_equal_isapprox
 using LinearAlgebra: ⋅, ×
 using GLTF
+using Dictionaries
+using MLStyle
 
 const Optional{T} = Union{T, Nothing}
 

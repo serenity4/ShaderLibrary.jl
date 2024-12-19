@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <shaders>
-  <shader name="gradient">
+  <shader name="sprite">
     <component name="camera-projection"/>
     <component name="uv-vertex">
       <data name="uv"/>

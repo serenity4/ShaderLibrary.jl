@@ -1,5 +1,5 @@
 using ShaderLibrary, Test
-using ShaderLibrary: generate_shaders, validate_shader_stages, is_previous_stage
+using ShaderLibrary: generate_shaders, validate_shader_stages, is_previous_stage, emit_shader, xmldocument
 using EzXML: readxml, parsexml
 
 components = readxml(joinpath(dirname(@__DIR__), "src", "components.xml"))
@@ -43,4 +43,5 @@ output = joinpath(@__DIR__, "generated.jl")
   ret = generate_shaders(components, shaders)
   @test length(ret.components) ≥ 9
   @test length(ret.shaders) ≥ 3
+  @test isa(emit_shader(stdout, ret.shaders[1]), String)
 end;
