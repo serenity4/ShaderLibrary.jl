@@ -51,3 +51,31 @@ function ProgramInvocationData(shader::MipmapGamma, prog, invocations)
     @block MipmapGammaData(@descriptor(image), @descriptor(mipmap))
   end
 end
+
+function generate_mipmaps(resource::Resource, device::Device, submission::Optional{SubmissionInfo} = nothing)
+  assert_type(resource, RESOURCE_TYPE_IMAGE)
+  generate_mipmaps(resource.image, device, submission)
+end
+
+function generate_mipmaps(image::Image, device::Device, submission::Optional{SubmissionInfo} = nothing)
+  range = mip_range(image)
+  length(range) == 1 && throw(ArgumentError("Mipmap generation requires more than one mip level"))
+  mip_levels = range[2]:last(range)
+  parameters = ShaderParameters()
+  ni, nj = dimensions(image)
+  invocations = (cld(ni, 8), cld(nj, 8))
+  render_graph = RenderGraph(device)
+  for layer in layer_range(image)
+    base_level = first(range)
+    for mip_level in mip_levels
+      base = image_view_resource(image; layer_range = layer:layer, mip_range = base_level:base_level)
+      mipmap = image_view_resource(image; layer_range = layer:layer, mip_range = mip_level:mip_level)
+      shader = MipmapGamma(base, mipmap)
+      command = renderables(shader, parameters, device, invocations)
+      add_node!(render_graph, command)
+      base_level = mip_level
+    end
+  end
+  isnothing(submission) && return render!(render_graph)
+  render!(render_graph, submission)
+end

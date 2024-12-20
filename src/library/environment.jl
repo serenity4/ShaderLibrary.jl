@@ -26,7 +26,7 @@ Accessors.constructorof(::Type{Environment{T,E}}) where {T,E} = Environment{T,E}
 interface(env::Environment) = Tuple{Vector{Vec3},Nothing,Nothing}
 user_data(env::Environment, ctx) = instantiate(env.texture, ctx)
 resource_dependencies(env::Environment) = @resource_dependencies begin
-  @read env.texture.image::Texture
+  @read env.texture.resource::Texture
 end
 
 function environment_vert(position, direction, index, (; data)::PhysicalRef{InvocationData})

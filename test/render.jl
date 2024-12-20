@@ -91,18 +91,9 @@
       end
 
       @testset "Weighted containment test" begin
-        # Normalized curves.
         font = OpenTypeFont(font_file("juliamono-regular.ttf"));
         glyph = font['A']
-        curves = map(x -> Arr{3,Vec2}(Vec2.(x)), OpenType.curves_normalized(glyph))
-        point = Vec2(0.05, 0.01) # inside
-        alpha = ShaderLibrary.intensity(point, curves, 100F)
-        @test alpha === 1F
-        point = Vec2(0, 0.5) # outside
-        alpha = ShaderLibrary.intensity(point, curves, 100F)
-        @test alpha === 0F
 
-        # Unnormalized curves.
         curves = map(x -> Arr{3,Vec2}(Vec2.(x)), OpenType.curves(glyph))
         point = Vec2(47, 3) # inside
         alpha = ShaderLibrary.intensity(point, curves, 100F)

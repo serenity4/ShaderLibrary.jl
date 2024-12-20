@@ -43,5 +43,5 @@ output = joinpath(@__DIR__, "generated.jl")
   ret = generate_shaders(components, shaders)
   @test length(ret.components) ≥ 9
   @test length(ret.shaders) ≥ 3
-  @test isa(emit_shader(stdout, ret.shaders[1]), String)
+  @test isa(sprint(emit_shader, ret.shaders[1]), String)
 end;

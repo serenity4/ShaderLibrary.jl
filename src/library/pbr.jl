@@ -180,9 +180,9 @@ function resource_dependencies(pbr::PBR)
   # XXX: Don't use Lava internals like that.
   deps = Lava.Dictionary{Resource,ResourceDependency}()
   for probe in pbr.probes
-    Lava.set!(deps, probe.irradiance.image, Lava.ResourceDependency(Lava.ResourceUsageType(Lava.RESOURCE_USAGE_TEXTURE), Lava.MemoryAccess(Lava.READ), nothing, nothing))
-    Lava.set!(deps, probe.prefiltered_environment.image, Lava.ResourceDependency(Lava.ResourceUsageType(Lava.RESOURCE_USAGE_TEXTURE), Lava.MemoryAccess(Lava.READ), nothing, nothing))
-    Lava.set!(deps, probe.brdf_integration_map.image, Lava.ResourceDependency(Lava.ResourceUsageType(Lava.RESOURCE_USAGE_TEXTURE), Lava.MemoryAccess(Lava.READ), nothing, nothing))
+    Lava.set!(deps, probe.irradiance.resource, Lava.ResourceDependency(Lava.ResourceUsageType(Lava.RESOURCE_USAGE_TEXTURE), Lava.MemoryAccess(Lava.READ), nothing, nothing))
+    Lava.set!(deps, probe.prefiltered_environment.resource, Lava.ResourceDependency(Lava.ResourceUsageType(Lava.RESOURCE_USAGE_TEXTURE), Lava.MemoryAccess(Lava.READ), nothing, nothing))
+    Lava.set!(deps, probe.brdf_integration_map.resource, Lava.ResourceDependency(Lava.ResourceUsageType(Lava.RESOURCE_USAGE_TEXTURE), Lava.MemoryAccess(Lava.READ), nothing, nothing))
   end
   deps
 end

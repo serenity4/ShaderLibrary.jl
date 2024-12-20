@@ -9,7 +9,7 @@ PrefilteredEnvironmentConvolution(resource::Resource, roughness) = PrefilteredEn
 interface(shader::PrefilteredEnvironmentConvolution) = Tuple{Vector{Vec3},Nothing,Nothing}
 user_data(shader::PrefilteredEnvironmentConvolution, ctx) = (instantiate(shader.texture, ctx), shader.roughness)
 resource_dependencies(shader::PrefilteredEnvironmentConvolution) = @resource_dependencies begin
-  @read shader.texture.image::Texture
+  @read shader.texture.resource::Texture
 end
 
 # -------------------------------------------------

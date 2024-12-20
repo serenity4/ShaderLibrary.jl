@@ -52,7 +52,7 @@ end
 
 user_data(blur::GaussianBlurDirectional, ctx) = (blur.direction, blur.size, instantiate(blur.texture, ctx))
 resource_dependencies(blur::GaussianBlurDirectional) = @resource_dependencies begin
-  @read blur.texture.image::Texture
+  @read blur.texture.resource::Texture
 end
 interface(::GaussianBlurDirectional) = Tuple{Vector{Vec2},Nothing,Nothing}
 
@@ -64,7 +64,7 @@ GaussianBlur(image::Resource, size = 0.01) = GaussianBlur(default_texture(image)
 
 function renderables(cache::ProgramCache, blur::GaussianBlur, parameters::ShaderParameters, geometry)
   color = parameters.color[1]
-  transient_color = similar(color; blur.texture.image.image.dims, usage_flags = Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT, name = :transient_color)
+  transient_color = similar(color; dims = dimensions(blur.texture.resource), usage_flags = Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT, name = :transient_color)
 
   # First, blur the whole texture once, then blur only the relevant portion.
   # XXX: We could deduce a conservative bounding box from the radius

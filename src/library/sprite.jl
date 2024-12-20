@@ -25,5 +25,5 @@ end
 interface(::Sprite) = Tuple{Vector{Vec2},Nothing,Nothing}
 user_data(sprite::Sprite, ctx) = instantiate(sprite.texture, ctx)
 resource_dependencies(sprite::Sprite) = @resource_dependencies begin
-  @read sprite.texture.image::Texture
+  @read sprite.texture.resource::Texture
 end

@@ -35,6 +35,12 @@
     compute(device, shader, ShaderParameters(), (64, 64, 1))
     data = collect(shader.mipmap, device)
     save_test_render("mipmap_gamma.png", data, 0xf371ddeeadd54ab0)
+
+    image = image_resource(device, nothing; dims = size(texture), format = eltype(texture), usage_flags = Vk.IMAGE_USAGE_STORAGE_BIT | Vk.IMAGE_USAGE_TRANSFER_SRC_BIT | Vk.IMAGE_USAGE_TRANSFER_DST_BIT, mip_levels = 6)
+    copyto!(image, texture, device; mip_level = 1)
+    generate_mipmaps(image, device)
+    data = collect(image, device; mip_level = 4)
+    save_test_render("texture_mipmap_4.png", data, 0xe4a93750f02b4be5)
   end
 
   @testset "Large-scale terrain erosion" begin

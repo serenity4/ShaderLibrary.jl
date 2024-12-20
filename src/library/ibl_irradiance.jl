@@ -13,7 +13,7 @@ IrradianceConvolution(resource::Resource) = IrradianceConvolution{resource.image
 interface(shader::IrradianceConvolution) = Tuple{Vector{Vec3},Nothing,Nothing}
 user_data(shader::IrradianceConvolution, ctx) = instantiate(shader.texture, ctx)
 resource_dependencies(shader::IrradianceConvolution) = @resource_dependencies begin
-  @read shader.texture.image::Texture
+  @read shader.texture.resource::Texture
 end
 
 function convolve_hemisphere(f, ::Type{T}, center, dθ, dϕ) where {T}

@@ -104,7 +104,7 @@ export
   PrefilteredEnvironmentConvolution, compute_prefiltered_environment,
 
   # Compute shader components
-  GammaCorrection,
+  GammaCorrection, generate_mipmaps,
   MipmapGamma,
   LargeScaleErosion,
 
