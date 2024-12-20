@@ -27,10 +27,21 @@ RenderTargets(parameters::ShaderParameters) = RenderTargets(parameters.color, pa
 
 struct ProgramCache
   device::Device
-  programs::IdDict{Type,Program}
+  programs::IdDict{Any,Program}
 end
 ProgramCache(device) = ProgramCache(device, IdDict{Type,Program}())
-Base.get!(cache::ProgramCache, T::Type) = get!(() -> Program(T, cache.device), cache.programs, T)
+
+cache_program_by_type(::Type{<:ShaderComponent}) = true
+cache_key(::ShaderComponent) = error("Shaders implementing their own caching behavior must extend `cache_key(shader)` with the key to be used for caching")
+
+function Base.get!(cache::ProgramCache, shader::ShaderComponent)
+  T = typeof(shader)
+  if cache_program_by_type(T)
+    get!(() -> Program(T, cache.device), cache.programs, T)
+  else
+    get!(() -> Program(shader, cache.device), cache.programs, cache_key(shader))
+  end
+end
 Base.empty!(cache::ProgramCache) = empty!(cache.programs)
 
 user_data(::ShaderComponent, ctx) = nothing
@@ -66,7 +77,7 @@ end
 
 function Command(cache::ProgramCache, shader::GraphicsShaderComponent, parameters::ShaderParameters, geometry)
   !isempty(parameters.color) || throw(ArgumentError("At least one color attachment must be provided."))
-  prog = get!(cache, typeof(shader))
+  prog = get!(cache, shader)
   graphics_command(
     DrawIndexed(geometry),
     prog,
@@ -103,7 +114,7 @@ abstract type Material <: GraphicsShaderComponent end
 abstract type ComputeShaderComponent <: ShaderComponent end
 
 function Command(cache::ProgramCache, shader::ComputeShaderComponent, parameters::ShaderParameters, invocations)
-  prog = get!(cache, typeof(shader))
+  prog = get!(cache, shader)
   compute_command(
     Dispatch(invocations...),
     prog,

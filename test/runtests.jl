@@ -1,5 +1,6 @@
 using ShaderLibrary
 using ShaderLibrary: glyph_quads, Text, linear_index, image_index, GaussianBlurDirectionalComp, GaussianBlurComp, spherical_uv_mapping, scatter_light_sources, compute_lighting_from_sources, BRDFIntegration, cubemap_to_world, world_to_cubemap, pixel_size
+using FixedPointNumbers
 using Test
 using Lava
 using Accessors: @set, @reset, setproperties
@@ -29,4 +30,5 @@ parameters = ShaderParameters(color; color_clear = [ClearValue((0.08, 0.05, 0.1,
   include("environment.jl")
   include("pbr.jl")
   include("compute.jl")
+  include("cache.jl")
 end;

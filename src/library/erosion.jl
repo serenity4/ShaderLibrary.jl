@@ -29,7 +29,7 @@ function large_scale_erosion_comp!(data_address::DeviceAddressBlock, images, glo
 end
 
 function renderables(cache::ProgramCache, shader::LargeScaleErosion, parameters::ShaderParameters, invocations)
-  prog = get!(cache, typeof(shader))
+  prog = get!(cache, shader)
   simulation_step = compute_command(
     Dispatch(invocations...),
     prog,
