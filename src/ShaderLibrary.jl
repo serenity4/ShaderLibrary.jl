@@ -6,7 +6,7 @@ using Preferences
 using StaticArrays
 using Accessors: Accessors, @set, @reset, setproperties
 using ColorTypes
-using SPIRV: SPIRV, validate, U, F, image_type, πF, @for
+using SPIRV: SPIRV, validate, U, F, image_type, πF, @for, @discard
 using SPIRV.MathFunctions
 using Reexport
 using Swizzles: @swizzle
@@ -50,6 +50,7 @@ include("library/ibl_irradiance.jl")
 include("library/ibl_prefilter.jl")
 include("library/ibl_brdf_integration.jl")
 include("library/mipmap.jl")
+include("library/fragment_location_test.jl")
 
 include("cubemap.jl")
 include("ibl.jl")
@@ -102,6 +103,7 @@ export
   Text,
   IrradianceConvolution, compute_irradiance,
   PrefilteredEnvironmentConvolution, compute_prefiltered_environment,
+  FragmentLocationTest,
 
   # Compute shader components
   GammaCorrection, generate_mipmaps,

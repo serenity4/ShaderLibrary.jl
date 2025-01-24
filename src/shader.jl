@@ -10,9 +10,9 @@ struct ShaderParameters
   color::Vector{Resource}
   color_clear::Vector{Optional{ClearValue}}
   depth::Optional{Resource}
-  depth_clear::Float32
+  depth_clear::Optional{Float32}
   stencil::Optional{Resource}
-  stencil_clear::UInt32
+  stencil_clear::Optional{UInt32}
   render_state::RenderState
   invocation_state::ProgramInvocationState
   camera::Camera
@@ -21,7 +21,7 @@ struct ShaderParameters
   dpmm::Optional{Vec2U}
 end
 
-ShaderParameters(color...; color_clear = fill(DEFAULT_CLEAR_VALUE, length(color)), depth = nothing, depth_clear = 0F, stencil = nothing, stencil_clear = 0U, render_state = RenderState(), invocation_state = ProgramInvocationState(), camera = Camera(), unit = UNIT_NONE, dpmm = nothing) = ShaderParameters(collect(color), color_clear, depth, depth_clear, stencil, stencil_clear, render_state, invocation_state, camera, unit, dpmm)
+ShaderParameters(color...; color_clear = fill(DEFAULT_CLEAR_VALUE, length(color)), depth = nothing, depth_clear = nothing, stencil = nothing, stencil_clear = nothing, render_state = RenderState(), invocation_state = ProgramInvocationState(), camera = Camera(), unit = UNIT_NONE, dpmm = nothing) = ShaderParameters(collect(color), color_clear, depth, depth_clear, stencil, stencil_clear, render_state, invocation_state, camera, unit, dpmm)
 
 RenderTargets(parameters::ShaderParameters) = RenderTargets(parameters.color, parameters.depth, parameters.stencil)
 
@@ -71,13 +71,13 @@ function resource_dependencies(shader::GraphicsShaderComponent, parameters::Shad
   end
   samples = !isempty(color) ? Lava.samples(color[1]) : nothing
   if !isnothing(depth) || !isnothing(stencil)
-    usage = ResourceUsageType()
     usage, depth_stencil_clear, resource = @match (depth, stencil) begin
-      (::Resource, ::Nothing) => (RESOURCE_USAGE_DEPTH_ATTACHMENT, ClearValue(depth_clear), depth)
-      (::Nothing, ::Resource) => (RESOURCE_USAGE_STENCIL_ATTACHMENT, ClearValue(stencil_clear), stencil)
+      (::Resource, ::Nothing) => (RESOURCE_USAGE_DEPTH_ATTACHMENT, isnothing(depth_clear) ? nothing : ClearValue(depth_clear), depth)
+      (::Nothing, ::Resource) => (RESOURCE_USAGE_STENCIL_ATTACHMENT, isnothing(stencil_clear) ? nothing : ClearValue(stencil_clear), stencil)
       (::Resource, ::Resource) => begin
         depth === stencil || error("The depth and stencil attachments must be the same resource if both are provided")
-        (RESOURCE_USAGE_DEPTH_ATTACHMENT | RESOURCE_USAGE_STENCIL_ATTACHMENT, ClearValue((depth_clear, stencil_clear)), depth)
+        depth_stencil_clear = isnothing(depth_clear) && isnothing(stencil_clear) ? nothing : ClearValue((depth_clear, stencil_clear))
+        (RESOURCE_USAGE_DEPTH_ATTACHMENT | RESOURCE_USAGE_STENCIL_ATTACHMENT, depth_stencil_clear, depth)
       end
     end
     insert!(dependencies, resource, ResourceDependency(usage, READ | WRITE, depth_stencil_clear, samples))

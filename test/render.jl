@@ -30,6 +30,72 @@
     save_test_render("rectangle.png", data, 0x79bb773f3f4ca5e1)
   end
 
+  @testset "Fragment location tests" begin
+    color_one_sample = color_attachment(device, dimensions(color))
+    depth = depth_or_stencil_attachment(device, dimensions(color), Vk.FORMAT_D32_SFLOAT)
+    shader_parameters = setproperties(parameters, (; color = [color_one_sample], depth, depth_clear = 0.4))
+    rect = Rectangle(Vec2(0.5, 0.5), nothing, nothing) # actually a square
+    primitive = Primitive(rect, Vec3(-0.4, -0.4, -1.0))
+    shader = let center = @swizzle primitive.transform.translation.vec.xy
+      FragmentLocationTest(p -> norm(p - center) < 0.4)
+    end
+    render(device, shader, shader_parameters, primitive)
+    data = collect(depth, device)
+    @test data[1] === 0.4f0
+    @test data[700, 800] === 0.01f0
+    @test 140000 < count(x -> x === 0.01f0, data) < 150000
+    render(device, FragmentLocationTest(p -> false), shader_parameters, primitive)
+    data = collect(depth, device)
+    @test all(x -> x === 0.4f0, data)
+    render(device, FragmentLocationTest(Returns(true)), shader_parameters, primitive)
+    data = collect(depth, device)
+    @test count(x -> x === 0.01f0, data) > 290000
+
+    # Do the same but using a stencil this time.
+    color_one_sample = color_attachment(device, dimensions(color))
+    stencil = depth_or_stencil_attachment(device, dimensions(color), Vk.FORMAT_S8_UINT)
+    shader_parameters = setproperties(parameters, (; color = [color_one_sample], stencil, stencil_clear = 0x00))
+    @reset shader_parameters.render_state.enable_stencil_testing = true
+    @reset shader_parameters.render_state.stencil_front.pass_op = Vk.STENCIL_OP_REPLACE
+    render(device, shader, shader_parameters, primitive)
+    data = collect(stencil, device)
+    @test data[1] === 0x00
+    @test data[700, 800] === 0x01
+    @test 140000 < count(x -> x === 0x01, data) < 150000
+    render(device, FragmentLocationTest(p -> false), shader_parameters, primitive)
+    data = collect(stencil, device)
+    @test all(x -> x === 0x00, data)
+    render(device, FragmentLocationTest(Returns(true)), shader_parameters, primitive)
+    data = collect(stencil, device)
+    @test count(x -> x === 0x01, data) > 290000
+
+    # And then with a combined depth/stencil attachment.
+    color_one_sample = color_attachment(device, dimensions(color))
+    depth_stencil = depth_or_stencil_attachment(device, dimensions(color), Vk.FORMAT_D32_SFLOAT_S8_UINT)
+    shader_parameters = setproperties(parameters, (; color = [color_one_sample], depth = depth_stencil, stencil = depth_stencil, depth_clear = 0.4, stencil_clear = 0))
+    @reset shader_parameters.render_state.enable_stencil_testing = true
+    @reset shader_parameters.render_state.stencil_front.pass_op = Vk.STENCIL_OP_REPLACE
+    render(device, shader, shader_parameters, primitive)
+    depth = ImageView(depth_stencil.attachment.view.image; aspect = Vk.IMAGE_ASPECT_DEPTH_BIT)
+    stencil = ImageView(depth_stencil.attachment.view.image; aspect = Vk.IMAGE_ASPECT_STENCIL_BIT)
+    data = collect(depth, device)
+    @test data[1] === 0.4f0
+    @test data[700, 800] === 0.01f0
+    @test 140000 < count(x -> x === 0.01f0, data) < 150000
+    data = collect(stencil, device)
+    @test data[1] === 0x00
+    @test data[700, 800] === 0x01
+    @test 140000 < count(x -> x === 0x01, data) < 150000
+    render(device, FragmentLocationTest(p -> false), shader_parameters, primitive)
+    # XXX: This yields a validation error on image layout, perhaps a SubresourceMap bug.
+    # XXX: My guess is that image layouts are not well tracked across aspects.
+    @test all(x -> x === 0.4f0, collect(depth, device))
+    @test all(x -> x === 0x00, collect(stencil, device))
+    render(device, FragmentLocationTest(Returns(true)), shader_parameters, primitive)
+    @test count(x -> x === 0.01f0, collect(depth, device)) > 290000
+    @test count(x -> x === 0x01, collect(stencil, device)) > 290000
+  end
+
   @testset "Sprites" begin
     texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT)
     vertex_locations = Vec2[(-0.4, -0.4), (0.4, -0.4), (0.0, 0.6)]

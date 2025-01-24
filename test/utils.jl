@@ -15,6 +15,10 @@ function color_attachment(device, dimensions; samples = 1)
   color = attachment_resource(device, nothing; name = :color_target, format = RGBA{Float16}, samples, usage_flags = Vk.IMAGE_USAGE_TRANSFER_SRC_BIT | Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_COLOR_ATTACHMENT_BIT, dims = dimensions)
 end
 
+function depth_or_stencil_attachment(device, dimensions, format; samples = 1, name = nothing)
+  attachment_resource(device, nothing; name, format, samples, usage_flags = Vk.IMAGE_USAGE_TRANSFER_SRC_BIT | Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, dims = dimensions)
+end
+
 function save_render(path, data)
   mkpath(dirname(path))
   ispath(path) && rm(path)
