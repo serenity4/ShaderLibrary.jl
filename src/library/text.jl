@@ -20,7 +20,7 @@ function renderables(cache::ProgramCache, text::Text, parameters::ShaderParamete
   # Render backgrounds first.
   for segment in line.segments
     isnothing(segment.style.background) && continue
-    command = Command(cache, Gradient(), parameters, background_decoration(line, segment, location, segment.style.background))
+    command = Command(cache, Gradient{Vec4}(), parameters, background_decoration(line, segment, location, segment.style.background))
     isempty(background_renders) && (parameters = @set parameters.color_clear = no_clear)
     push!(background_renders, command)
   end
@@ -97,7 +97,7 @@ function linear_decoration(line::Line, segment::LineSegment, origin::Point{3}, c
 end
 
 function background_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::RGBA{Float32})
-  color = Vec3(color.r, color.g, color.b)
+  color = Vec4(color.r, color.g, color.b, color.alpha)
   geometry = segment_geometry(line, segment)
   vertex_data = fill(color, 4)
   decoration = Rectangle(geometry, vertex_data, nothing)
