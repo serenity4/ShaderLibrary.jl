@@ -20,7 +20,9 @@ function renderables(cache::ProgramCache, text::Text, parameters::ShaderParamete
   # Render backgrounds first.
   for segment in line.segments
     isnothing(segment.style.background) && continue
-    command = Command(cache, Gradient{Vec4}(), parameters, background_decoration(line, segment, location, segment.style.background))
+    (; r, g, b, alpha) = something(segment.style.background, RGBA(1f0, 1f0, 1f0, 1f0))
+    color = Vec4(r, g, b, alpha)
+    command = Command(cache, Gradient{Vec4}(), parameters, background_decoration(line, segment, location, color))
     isempty(background_renders) && (parameters = @set parameters.color_clear = no_clear)
     push!(background_renders, command)
   end
@@ -28,22 +30,22 @@ function renderables(cache::ProgramCache, text::Text, parameters::ShaderParamete
   # Then render glyphs.
   for segment in line.segments
     has_outlines(line, segment) || continue
-    (; r, g, b) = something(segment.style.color, RGB(1f0, 1f0, 1f0))
-    color = Vec3(r, g, b)
+    (; r, g, b, alpha) = something(segment.style.color, RGBA(1f0, 1f0, 1f0, 1f0))
+    color = Vec4(r, g, b, alpha)
     (; position, quads, curves) = glyph_quads(line, segment, location, color)
     qbf = QuadraticBezierFill(curves)
     command = Command(cache, qbf, parameters, quads)
     isempty(text_renders) && (parameters = @set parameters.color_clear = no_clear)
     push!(text_renders, command)
-    segment.style.underline && push!(text_renders, Command(cache, Gradient(), parameters, underline_decoration(line, segment, location, color)))
-    segment.style.strikethrough && push!(text_renders, Command(cache, Gradient(), parameters, strikethrough_decoration(line, segment, location, color)))
+    segment.style.underline && push!(text_renders, Command(cache, Gradient{Vec4}(), parameters, underline_decoration(line, segment, location, color)))
+    segment.style.strikethrough && push!(text_renders, Command(cache, Gradient{Vec4}(), parameters, strikethrough_decoration(line, segment, location, color)))
   end
 
   isempty(background_renders) && return text_renders
   [background_renders, text_renders]
 end
 
-function glyph_quads(line::Line, segment::LineSegment, origin::Vec3, color::Vec3)
+function glyph_quads(line::Line, segment::LineSegment, origin::Vec3, color::Vec4)
   quads = Primitive{QuadraticBezierPrimitiveData,Vector{Vec2},Nothing,Vector{Vec2}}[]
   curves = Arr{3,Vec2}[]
   processed_glyphs = Dict{Int64,UnitRange{Int64}}() # to glyph range
@@ -73,21 +75,21 @@ function glyph_quads(line::Line, segment::LineSegment, origin::Vec3, color::Vec3
   (; position, quads, curves)
 end
 
-function underline_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::Vec3)
+function underline_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::Vec4)
   decoration = linear_decoration(line, segment, origin, color)
   offset = 200segment.style.size
   baseline = @set origin.y -= offset
   Primitive(decoration, baseline)
 end
 
-function strikethrough_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::Vec3)
+function strikethrough_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::Vec4)
   decoration = linear_decoration(line, segment, origin, color)
   offset = (ascender(segment) + descender(segment)) / 2
   line_center = @set origin.y += offset
   Primitive(decoration, line_center)
 end
 
-function linear_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::Vec3)
+function linear_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::Vec4)
   height = 75segment.style.size
   margin = 75segment.style.size
   box = segment_geometry(line, segment)
@@ -96,8 +98,7 @@ function linear_decoration(line::Line, segment::LineSegment, origin::Point{3}, c
   Rectangle(geometry, vertex_data, nothing)
 end
 
-function background_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::RGBA{Float32})
-  color = Vec4(color.r, color.g, color.b, color.alpha)
+function background_decoration(line::Line, segment::LineSegment, origin::Point{3}, color::Vec4)
   geometry = segment_geometry(line, segment)
   vertex_data = fill(color, 4)
   decoration = Rectangle(geometry, vertex_data, nothing)

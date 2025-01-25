@@ -56,7 +56,7 @@ end
 struct QuadraticBezierPrimitiveData
   range::UnitRange{UInt32}
   font_size::Float32
-  color::Vec3
+  color::Vec4
 end
 
 function quadratic_bezier_fill_vert(position, grid_position, frag_primitive_index, index, (; data)::PhysicalRef{InvocationData})
@@ -67,10 +67,10 @@ end
 
 function quadratic_bezier_fill_frag(out_color, grid_position, primitive_index, (; data)::PhysicalRef{InvocationData})
   (; color, range, font_size) = @load data.primitive_data[primitive_index.x]::QuadraticBezierPrimitiveData
-  curves_start = DeviceAddress(UInt64(data.user_data) + sizeof(QuadraticBezierPrimitiveData)U*(range[1U] - 1U))
+  curves_start = DeviceAddress(UInt64(data.user_data) + sizeof(Arr{3,Vec2})U*(range[1U] - 1U))
   curves = PhysicalBuffer{Arr{3,Vec2}}(length(range), curves_start)
-  @swizzle out_color.rgb = color
-  @swizzle out_color.a = intensity(grid_position, curves, font_size)
+  @swizzle out_color.rgb = @swizzle color.rgb
+  @swizzle out_color.a = intensity(grid_position, curves, font_size) * @swizzle color.a
 end
 
 function Program(::Type{QuadraticBezierFill}, device)

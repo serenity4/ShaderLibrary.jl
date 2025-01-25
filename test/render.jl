@@ -184,7 +184,7 @@
     transform((x, y)) = Vec2(remap(x, glyph.header.xmin, glyph.header.xmax, 0, 1), remap(y, glyph.header.ymin, glyph.header.ymax, 0, 1))
     curves = map(ps -> Arr{3,Vec2}(transform.(ps)), OpenType.curves(glyph))
     qbf = QuadraticBezierFill(curves)
-    data = QuadraticBezierPrimitiveData(eachindex(curves), 0.5/pixel_size(parameters), Vec3(0.6, 0.4, 1.0))
+    data = QuadraticBezierPrimitiveData(eachindex(curves), 0.5/pixel_size(parameters), Vec4(0.6, 0.4, 1.0, 1.0))
     uvs = Vec2[(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)]
     rect = Rectangle(Vec2(0.5, 0.5), uvs, data)
     primitive = Primitive(rect)
@@ -196,7 +196,7 @@
     glyph = font['A']
     curves = map(x -> Arr{3,Vec2}(Vec2.(x)), OpenType.curves(glyph))
     qbf = QuadraticBezierFill(curves)
-    data = QuadraticBezierPrimitiveData(eachindex(curves), 100000F, Vec3(0.6, 0.4, 1.0))
+    data = QuadraticBezierPrimitiveData(eachindex(curves), 100000F, Vec4(0.6, 0.4, 1.0, 1.0))
     vertex_data = Vec2[(0, 0), (550, 0), (0, 550), (550, 550)]
     rect = Rectangle(Vec2(0.5, 0.5), vertex_data, data)
     primitive = Primitive(rect)
@@ -212,7 +212,7 @@
     text = OpenType.Text("The brown fox jumps over the lazy dog.", TextOptions())
     line = only(lines(text, [font => options]))
     segment = only(line.segments)
-    (; quads, curves) = glyph_quads(line, segment, zero(Vec3), Vec3(1, 1, 1))
+    (; quads, curves) = glyph_quads(line, segment, zero(Vec3), Vec4(1, 1, 1, 1))
     @test length(quads) == count(!isspace, text.chars)
     @test length(unique(rect.data.range for rect in quads)) == length(line.outlines)
 
@@ -224,10 +224,10 @@
     data = collect(color, device)
     save_test_render("text.png", data, 0x8aa232d949de880a)
 
-    text = OpenType.Text(styled"The{background=red: }{color=brown:brown} {underline:fo{size=$(30px):x}}{size=$(108px): {background=orange:jumps} {cyan:over} }the {color=purple:{strikethrough:l{size=$(100px):a}zy} beautiful} dog.", TextOptions())
+    text = OpenType.Text(styled"The{background=red: }{color=brown:brown} {underline:fo{size=$(30px):x}}{size=$(108px): {background=orange:jumps} {cyan:over} }the {color=purple:{strikethrough:l{size=$(100px),color=#ff000022:a}zy} beautiful} dog.", TextOptions())
     render(device, Text(text, font, options), parameters_ssaa, (-1.7, 0))
     data = collect(color, device)
-    save_test_render("text_rich.png", data, 0xaf02396a74ffda42)
+    save_test_render("text_rich.png", data, 0x437beaa5bbfc1896)
 
     font = OpenTypeFont(font_file("NotoSerifLao.ttf"));
     options = FontOptions(ShapingOptions(tag"lao ", tag"dflt"; enabled_features = Set([tag"aalt"])), 200px)
