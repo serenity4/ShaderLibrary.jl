@@ -45,7 +45,7 @@ function save_test_render(filename, data::Matrix, h = nothing; keep = true)
   save_render(path_tmp, data)
   data = read_png(eltype(data), path_tmp)
   if isnothing(h)
-    mv(path_tmp, path; force = true)
+    keep && mv(path_tmp, path; force = true)
     return (path, hash(data))
   end
   @test stat(path_tmp).size > 0

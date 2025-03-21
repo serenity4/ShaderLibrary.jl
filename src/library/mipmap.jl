@@ -80,8 +80,7 @@ function generate_mipmaps(image::Image, device::Device; submission::Optional{Sub
       base_level = mip_level
     end
   end
-  isnothing(submission) && return render!(render_graph)
-  render!(render_graph, submission)
+  render!(render_graph; submission)
 end
 
 function storage_image_format(format::Vk.Format)
