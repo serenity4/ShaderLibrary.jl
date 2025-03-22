@@ -58,24 +58,26 @@
     new_uplift_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT, usage_flags)
     new_drainage_image = image_resource(device, zeros(Float32, nx, ny); format = Vk.FORMAT_R32_SFLOAT, usage_flags)
     maps = ErosionMaps(drainage_image, new_drainage_image, elevation_image, new_elevation_image, uplift_image, new_uplift_image)
-    model = TectonicBasedErosion{GPU,Float32,UInt32}(nothing, 2000; speed = 100, smooth_factor = 0, stream_power = 0.0005, uplift_factor = 0.01, inverse_momentum_power = Inf32, scale = (150_000, 150_000), execution = Erosion.GPU())
+    model = TectonicBasedErosion{GPU,Float32,UInt32}(nothing, 10000; speed = 100, smooth_factor = 0, stream_power = 0.0005, uplift_factor = 0.01, inverse_momentum_power = Inf32, scale = (150_000, 150_000), execution = Erosion.GPU())
     shader = LargeScaleErosion{Float32, typeof(model)}(model, maps)
     commands = renderables(shader, ShaderParameters(), device, (cld(nx, 32), cld(ny, 32), 1))
-    for i in 1:model.iterations
-      render(device, commands)
-      # i % 20 == 0 && (data = collect(elevation_image, device); display(save_test_render(tempname() * ".png", remap.(data, extrema(data)..., 0F, 1F))))
+
+    function docompute()
+      rg = RenderGraph(device, commands)
+      Lava.bake!(rg)
+      execution = nothing
+      for i in 1:model.iterations
+        submission = i < model.iterations ? Lava.SubmissionInfo() : Lava.sync_submission(device)
+        command_buffer = Lava.request_command_buffer(device)
+        render(command_buffer, rg)
+        execution = Lava.submit!(submission, command_buffer)
+      end
+      wait(execution)
     end
-    # XXX: This used to render fine and faster, but now seems to run into race conditions.
-    # nodes = RenderNode[]
-    # for i in 1:model.iterations
-    #   for command in commands
-    #     push!(nodes, RenderNode(command))
-    #   end
-    # end
-    # @time render(device, nodes)
+    docompute()
 
     data = collect(elevation_image, device)
     data = remap.(data, extrema(data)..., 0F, 1F)
-    save_test_render("erosion.png", data, 0xb11688314b664975)
+    save_test_render("erosion.png", data, 0x263005a3ab2a7f3e)
   end
 end;
