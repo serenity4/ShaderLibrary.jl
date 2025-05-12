@@ -87,8 +87,6 @@
     @test data[700, 800] === 0x01
     @test 140000 < count(x -> x === 0x01, data) < 150000
     render(device, FragmentLocationTest(p -> false), shader_parameters, primitive)
-    # XXX: This yields a validation error on image layout, perhaps a SubresourceMap bug.
-    # XXX: My guess is that image layouts are not well tracked across aspects.
     @test all(x -> x === 0.4f0, collect(depth, device))
     @test all(x -> x === 0x00, collect(stencil, device))
     render(device, FragmentLocationTest(Returns(true)), shader_parameters, primitive)
