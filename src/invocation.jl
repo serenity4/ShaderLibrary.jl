@@ -168,6 +168,7 @@ This aspect ratio is notably useful to compute distortion-free device coordinate
 function aspect_ratio end
 
 aspect_ratio(r::Resource) = aspect_ratio(dimensions(r.data::Union{Image, LogicalImage, Attachment, LogicalAttachment}))
+aspect_ratio(area::RenderArea) = aspect_ratio((area.rect.extent.width, area.rect.extent.height))
 aspect_ratio(dims) = Float32(dims[1] / dims[2])
 aspect_ratio(::Nothing) = error("Dimensions must be specified for the reference attachment.")
 
