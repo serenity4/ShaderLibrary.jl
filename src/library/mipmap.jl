@@ -75,7 +75,7 @@ function generate_mipmaps(image::Image, device::Device; submission::Optional{Sub
       base = image_view_resource(image; format, usage = Vk.IMAGE_USAGE_STORAGE_BIT, layer_range = layer:layer, mip_range = base_level:base_level, name = :mipmap_base_image_view)
       mipmap = image_view_resource(image; format, usage = Vk.IMAGE_USAGE_STORAGE_BIT, layer_range = layer:layer, mip_range = mip_level:mip_level, name = :mipmap_mip_image_view)
       shader = MipmapGamma(base, mipmap)
-      command = renderables(shader, parameters, device, invocations)
+      command = renderables(cache, shader, parameters, invocations)
       add_node!(render_graph, command)
       base_level = mip_level
     end

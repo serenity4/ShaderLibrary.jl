@@ -28,21 +28,37 @@ RenderTargets(parameters::ShaderParameters) = RenderTargets(parameters.color, pa
 struct ProgramCache
   device::Device
   programs::IdDict{Any,Program}
+  lock::SpinLock
 end
-ProgramCache(device) = ProgramCache(device, IdDict{Type,Program}())
+ProgramCache(device) = ProgramCache(device, IdDict{Type,Program}(), SpinLock())
+
+@forward_methods ProgramCache field=:lock Base.lock Base.unlock
+
+Base.show(io::IO, cache::ProgramCache) = print(io, ProgramCache, '(', length(cache.programs), " programs)")
 
 cache_program_by_type(::Type{<:ShaderComponent}) = true
 cache_key(::ShaderComponent) = error("Shaders implementing their own caching behavior must extend `cache_key(shader)` with the key to be used for caching")
 
 function Base.get!(cache::ProgramCache, shader::ShaderComponent)
   T = typeof(shader)
-  if cache_program_by_type(T)
-    get!(() -> Program(T, cache.device), cache.programs, T)
-  else
-    get!(() -> Program(shader, cache.device), cache.programs, cache_key(shader))
+  key, argument = cache_program_by_type(T) ? (T, T) : (cache_key(shader), shader)
+
+  program = @lock cache get(cache.programs, key, nothing)
+  program !== nothing && return program
+  # This takes a while, so it's best to do it while not holding the lock.
+  program = Program(argument, cache.device)
+
+  @lock cache begin
+    # Try again to get a program, in case someone cached one in the meantime.
+    existing = get(cache.programs, key, nothing)
+    existing !== nothing && return existing
+    # It's now time to store the created program.
+    cache.programs[key] = program
   end
+
+  return program
 end
-Base.empty!(cache::ProgramCache) = empty!(cache.programs)
+Base.empty!(cache::ProgramCache) = @lock cache empty!(cache.programs)
 
 user_data(::ShaderComponent, ctx) = nothing
 
