@@ -82,7 +82,8 @@ GeometryExperiments.Box(parameters::ShaderParameters) = Box(parameters.camera, r
 function resource_dependencies(shader::GraphicsShaderComponent, parameters::ShaderParameters)
   (; color, color_clear, depth, depth_clear, stencil, stencil_clear) = parameters
   dependencies = @something(resource_dependencies(shader), Dictionary{Resource,ResourceDependency}())
-  for (attachment, clear) in zip(color, color_clear)
+  for (i, attachment) in enumerate(color)
+    clear = color_clear === nothing ? nothing : get(color_clear, i, nothing)
     insert!(dependencies, attachment, ResourceDependency(RESOURCE_USAGE_COLOR_ATTACHMENT, WRITE, clear, nothing))
   end
   samples = !isempty(color) ? Lava.samples(color[1]) : nothing
