@@ -11,6 +11,7 @@ end
 
 function renderables(cache::ProgramCache, text::Text, parameters::ShaderParameters, location)
   location = vec3(convert(Vec, location))
+  isempty(text.lines) && return Command[]
   length(text.lines) == 1 || error("Multi-line text is not supported yet")
   line = text.lines[1]
   background_renders = Command[]
