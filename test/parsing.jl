@@ -4,7 +4,6 @@ using EzXML: readxml, parsexml
 
 components = readxml(joinpath(dirname(@__DIR__), "src", "components.xml"))
 shaders = readxml(joinpath(dirname(@__DIR__), "src", "shaders.xml"))
-output = joinpath(@__DIR__, "generated.jl")
 
 @testset "Component library parsing" begin
   @testset "Shader stages" begin
@@ -43,5 +42,17 @@ output = joinpath(@__DIR__, "generated.jl")
   ret = generate_shaders(components, shaders)
   @test length(ret.components) ≥ 9
   @test length(ret.shaders) ≥ 3
-  @test isa(sprint(emit_shader, ret.shaders[1]), String)
+
+  output = sprint(generate_shaders, components, shaders)
+  @test startswith(output, "# This file was generated with ShaderLibrary.")
+  @test contains(output, "struct Sprite")
+  @test contains(output, "function sprite_vertex")
+  @test contains(output, "function sprite_fragment")
+  @test contains(output, "struct Pbr")
+  @test contains(output, "function pbr_vertex")
+  @test contains(output, "function pbr_fragment")
+  block = Meta.parse("begin; $output; end")
+  @test length(block.args) > 20
+  file = generate_shaders(tempname() * ".jl", components, shaders)
+  @test read(file, String) == output
 end;

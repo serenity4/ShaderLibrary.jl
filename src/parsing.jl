@@ -330,8 +330,8 @@ function parse_shader_components(xml::Document)
           push!(stage.outputs, XMLShaderStageOutput(dname, type, export_name, vertex_output, interpolation, nothing))
         elseif dtype === :code
           decl === last(decls) || error_invalid_xml("the <code> attribute must come last: $decl")
-          code = strip_linenums!(Meta.parse("begin $(decl.content) end"))
-          Meta.isexpr(code, :block, 1) && (code = code.args[1])
+          block = strip_linenums!(Meta.parse("begin $(decl.content) end"))
+          code = isexpr(block, :block, 1) ? block.args[1] : Expr(:let, Expr(:block), block)
           stage.code = code
         end
       end
@@ -401,40 +401,74 @@ function resolve_inputs!(shader::XMLShader)
   shader
 end
 
-function emit_types(io::IO, enums, types)
+const INSERT_LINE_NUMBER_NODES = Ref(false)
+
+isline(x) = false
+isline(x::LineNumberNode) = true
+
+function rmlines(ex)
+    @match ex begin
+        Expr(:macrocall, m, _,  args...) => Expr(:macrocall, m, nothing, args...)
+        Expr(head, args...) => Expr(head, filter(!isline, args)...)
+        a                         => a
+    end
+end
+
+walk(ex::Expr, inner, outer) = outer(Expr(ex.head, map(inner, ex.args)...))
+walk(ex, inner, outer) = outer(ex)
+prewalk(f, ex) = walk(f(ex), x -> prewalk(f, x), identity)
+striplines(ex) = prewalk(rmlines, ex)
+
+function process_line_number_nodes(ex)
+  INSERT_LINE_NUMBER_NODES[] && return ex
+  return striplines(ex)
+end
+
+function emit_types(io::IO, enums, structs)
   for decl in enums
-    println(io, decl)
-    println(io)
+    println(io, '\n', decl)
   end
   for decl in structs
-    println(io, decl)
-    println(io)
+    println(io, '\n', decl)
   end
 end
 
 function emit_shaders(io::IO, shaders)
   for shader in shaders
     emit_shader(io, shader)
+    emit_program(io, shader)
+    # XXX: emit_interface
+    # XXX: emit_invocation_data
+    # XXX: emit_resource_dependencies
   end
+end
+
+function name_for_shader_struct(shader::XMLShader)
+  xml_name = string(shader.name)
+  Symbol(join(uppercasefirst.(split(xml_name, '-'; keepempty=false))))
+end
+
+function name_for_shader_stage_function(shader::XMLShader, stage)
+  xml_name = string(shader.name)
+  base = replace(xml_name, '-' => '_')
+  Symbol(base, '_', stage)
 end
 
 function emit_shader(io::IO, shader::XMLShader)
   # TODO: Define `ShaderLibrary.Shader`.
-  sname = Symbol(uppercasefirst(string(shader.name)))
-  println(io, :(struct $sname <: Shader end))
+  type = :(struct $(name_for_shader_struct(shader)) <: Shader end)
+  println(io, '\n', process_line_number_nodes(type))
 
   stages = group_shader_stages(shader)
-
   extracted_data_categories = Set(DataCategory[])
 
   for (stage_name, vec) in pairs(stages)
-    fname = Symbol(shader.name, '_', stage_name)
+    fname = name_for_shader_stage_function(shader, stage_name)
     args = Expr[]
     body = Expr[]
 
-    inputs = Dictionary{XMLShaderStageInput,Any}()
-    outputs = Dictionary{XMLShaderStageOutput,Any}()
-    definitions = Expr[]
+    inputs = Dictionary{XMLShaderStageInput,Symbol}()
+    outputs = Dictionary{XMLShaderStageOutput,Symbol}()
     vertex_data_types = Union{Symbol, Expr}[]
     primitive_data_types = Union{Symbol, Expr}[]
     invocation_data_types = Union{Symbol, Expr}[]
@@ -449,11 +483,13 @@ function emit_shader(io::IO, shader::XMLShader)
       end
 
       for output in stage.outputs
+        haskey(outputs, output) && continue
         insert!(outputs, output, output.name)
         push!(args, Expr(:(::), output.name, :(Mutable{$(output.type)})))
       end
 
       for input in stage.inputs
+        haskey(inputs, input) && continue
         insert!(inputs, input, input.name)
         push!(args, Expr(:(::), input.name, input.type))
       end
@@ -487,8 +523,47 @@ function emit_shader(io::IO, shader::XMLShader)
 
     ex = :(function $fname($(args...)) end)
     append!(ex.args[2].args, body)
-    println(io, '\n', ex)
+    println(io, '\n', process_line_number_nodes(ex))
   end
+end
+
+function emit_program(io::IO, shader::XMLShader)
+  T = name_for_shader_struct(shader)
+  stages = group_shader_stages(shader)
+  variables = Symbol[]
+  shaders = Expr[]
+  for (stage_name, vec) in pairs(stages)
+    inputs = Dictionary{XMLShaderStageInput,Symbol}()
+    outputs = Dictionary{XMLShaderStageOutput,Symbol}()
+    args = Expr[]
+    for (component, stage) in vec
+      for output in stage.outputs
+        haskey(outputs, output) && continue
+        insert!(outputs, output, output.name)
+        push!(args, :(::Mutable{$(output.type)}::Output))
+      end
+    end
+    for (component, stage) in vec
+      for input in stage.inputs
+        haskey(inputs, input) && continue
+        insert!(inputs, input, input.name)
+        push!(args, :(::$(input.type)::Input))
+      end
+    end
+    push!(args, :(::PhysicalRef{InvocationData}::PushConstant))
+    # TODO: Add descriptor arrays
+    fname = name_for_shader_stage_function(shader, stage_name)
+    macrocall = :(@macro device $fname($(args...)))
+    macrocall.args[1] = Symbol('@', stage_name)
+    variable = Symbol(stage_name)
+    push!(variables, variable)
+    push!(shaders, :($variable = $macrocall))
+  end
+  ex = :(function Program(::Type{$T}, device)
+    $(shaders...)
+    Program($(variables...))
+  end)
+  println(io, '\n', process_line_number_nodes(ex))
 end
 
 function group_shader_stages(shader::XMLShader)
@@ -503,21 +578,21 @@ function group_shader_stages(shader::XMLShader)
 end
 
 function extract_data!(body::Vector{Expr},
-                   data::XMLShaderStageData,
-                   vertex_data_type::Optional{Union{Symbol, Expr}},
-                   is_vertex_output::Bool,
-                   primitive_data_type::Optional{Union{Symbol, Expr}},
-                   invocation_data_type::Optional{Union{Symbol, Expr}},
-                   i::Int)
+                       data::XMLShaderStageData,
+                       vertex_data_type::Optional{Union{Symbol, Expr}},
+                       is_vertex_output::Bool,
+                       primitive_data_type::Optional{Union{Symbol, Expr}},
+                       invocation_data_type::Optional{Union{Symbol, Expr}},
+                       i::Int)
   @tryswitch data.category begin
     @case &DATA_CATEGORY_CAMERA
     push!(body, :($(data.name) = data.camera))
 
     @case &DATA_CATEGORY_VERTEX_LOCATION
-    push!(body, :($(data.name) = data.vertex_locations[VertexIndex + 1U]))
+    push!(body, :($(data.name)[] = data.vertex_locations[VertexIndex + 1U]))
 
     @case &DATA_CATEGORY_VERTEX_NORMAL
-    push!(body, :($(data.name) = data.vertex_normals[VertexIndex + 1U]))
+    push!(body, :($(data.name)[] = data.vertex_normals[VertexIndex + 1U]))
 
     @case &DATA_CATEGORY_VERTEX_DATA
     value = data.type === vertex_data_type ? :vertex_data : :(vertex_data[$i * U])
@@ -563,10 +638,16 @@ function generate_shaders(components::Document, shaders::Document)
   (; enums, structs, components, shaders)
 end
 
-function generate_shaders(output, components, shaders)
+function generate_shaders(filename::AbstractString, components, shaders)
+  tmp = tempname() * ".jl"
+  open(io -> generate_shaders(io, components, shaders), tmp, "w+")
+  mv(tmp, filename; force = true)
+end
+
+function generate_shaders(io::IO, components, shaders)
   (; enums, structs, components, shaders) = generate_shaders(components, shaders)
-  open(output, "w+") do io
-    emit_types(io, enums, structs)
-    emit_shaders(io, shaders)
-  end
+  println(io, "# This file was generated with ShaderLibrary.jl")
+  emit_types(io, enums, structs)
+  emit_shaders(io, shaders)
+  println(io)
 end

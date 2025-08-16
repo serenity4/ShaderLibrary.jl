@@ -24,6 +24,7 @@ using Dictionaries
 using MLStyle
 using ForwardMethods: @forward_methods
 using Base.Threads: SpinLock
+using Base.Meta: isexpr
 
 const Optional{T} = Union{T, Nothing}
 
