@@ -99,6 +99,7 @@ XMLShaderStageInput(name, type, builtin::SPIRV.BuiltIn) = XMLShaderStageInput(na
   DATA_CATEGORY_VERTEX_NORMAL = 12
   DATA_CATEGORY_VERTEX_DATA = 13
   DATA_CATEGORY_PRIMITIVE_DATA = 21
+  DATA_CATEGORY_INSTANCE_DATA = 31
 end
 
 ispervertex(category::DataCategory) = 10 < UInt8(category) < 20
@@ -113,6 +114,7 @@ function DataCategory(category::Optional{Symbol})
   category === Symbol("vertex-normal") && return DATA_CATEGORY_VERTEX_NORMAL
   category === Symbol("vertex-data") && return DATA_CATEGORY_VERTEX_DATA
   category === Symbol("primitive-data") && return DATA_CATEGORY_PRIMITIVE_DATA
+  category === Symbol("instance-data") && return DATA_CATEGORY_INSTANCE_DATA
   error_invalid_xml("unknown data category: $category")
 end
 
@@ -351,7 +353,7 @@ function parse_shaders(xml::Document, components)
   components = Dict(component.name => component for component in components)
   for snode in findall("/shaders/shader", xml)
     sname = getattr(snode, "name"; symbol = true)
-    isnothing(sname) && error_invalid_xml("missing name for shader: $snode")
+    sname === nothing && error_invalid_xml("missing name for shader: $snode")
     shader = XMLShader(sname, XMLShaderStageData[], XMLShaderComponent[])
     push!(shaders, shader)
     for cnode in findall("./component", snode)
@@ -361,21 +363,61 @@ function parse_shaders(xml::Document, components)
       isnothing(component) && error("shader \"$sname\" references unknown shader component \"$cname\": $cnode")
       push!(shader.components, component)
     end
-    define_arguments!(shader)
+    for dnode in findall("./data", snode)
+      dname = getattr(dnode, "name"; symbol = true)
+      dtype = getattr(dnode, "type")
+      dcategory = getattr(dnode, "category")
+      dcategory = dcategory === nothing ? resolve_data_category(shader, dname) : DataCategory(dcategory)
+      dtype = @something(dtype, resolve_data_type(shader, dname))
+      default = getattr(dnode, "default"; parse = true)
+      data = XMLShaderStageData(dname, dcategory, dtype, default)
+      push!(shader.arguments, data)
+    end
+    check_data_arguments!(shader)
     resolve_inputs!(shader)
   end
   shaders
 end
 
-function define_arguments!(shader::XMLShader)
+function resolve_data(shader::XMLShader, name::Symbol)
   for component in shader.components
     for stage in component.stages
       for data in stage.data
-        iscustomdata(data.category) && !in(data, shader.arguments) && push!(shader.arguments, data)
+        data.name === name && return data
       end
     end
   end
-  shader
+  error("No component data could be resolved for shader data entry $name")
+end
+
+function resolve_data_category(shader::XMLShader, name::Symbol)
+  data = resolve_data(shader, name)
+  return data.category
+end
+
+function resolve_data_type(shader::XMLShader, name::Symbol)
+  data = resolve_data(shader, name)
+  return data.type
+end
+
+function check_data_arguments!(shader::XMLShader)
+  unknown = XMLShaderStageData[]
+  for component in shader.components
+    for stage in component.stages
+      for data in stage.data
+        iscustomdata(data.category) || continue
+        data.default !== nothing && continue
+        i = findfirst(x -> x.name == data.name && x.type == data.type, shader.arguments)
+        if i === nothing
+          push!(unknown, data)
+        else
+          matched = shader.arguments[i]
+          matched.category != data.category && error("Data categories do not match for $(data.name): $(matched.category) (shader) vs $(data.category) (component)")
+        end
+      end
+    end
+  end
+  !isempty(unknown) && error("Shader $(shader.name) has no entry for the following component data entries: $(join(map(x -> x.name, unknown), ", "))")
 end
 
 function resolve_inputs!(shader::XMLShader)
@@ -384,8 +426,8 @@ function resolve_inputs!(shader::XMLShader)
   for component in shader.components
     for stage in component.stages
       for (i, input) in enumerate(stage.inputs)
-        isnothing(input.builtin) || continue
-        isnothing(input.from) || continue
+        input.builtin === nothing || continue
+        input.from === nothing || continue
         push!(unresolved, stage => i)
       end
       push!(stages, stage)
@@ -395,7 +437,7 @@ function resolve_inputs!(shader::XMLShader)
   for (stage, i) in unresolved
     input = stage.inputs[i]
     resolved = resolve_input(input.name, stage, stages, stage_types)
-    isnothing(resolved) && error("input `$(input.name)` in shader stage `$(stage.name))` of shader \"$sname\" is unresolved; an `output` from a previous stage must match")
+    resolved === nothing && error("input `$(input.name)` in shader stage `$(stage.name))` of shader \"$sname\" is unresolved; an `output` from a previous stage must match")
     stage.inputs[i] = @set input.from = resolved
   end
   shader
@@ -409,8 +451,8 @@ isline(x::LineNumberNode) = true
 function rmlines(ex)
     @match ex begin
         Expr(:macrocall, m, _,  args...) => Expr(:macrocall, m, nothing, args...)
-        Expr(head, args...) => Expr(head, filter(!isline, args)...)
-        a                         => a
+        Expr(head, args...)              => Expr(head, filter(!isline, args)...)
+        a                                => a
     end
 end
 
@@ -424,6 +466,16 @@ function process_line_number_nodes(ex)
   return striplines(ex)
 end
 
+const INSERT_COMMENTS = Ref(true)
+
+struct Comment
+  msg::String
+  Comment(msg::AbstractString) = new(msg)
+  Comment(msg) = Comment(string(msg))
+end
+
+Base.show(io::IO, comment::Comment) = print(io, "# ", comment.msg)
+
 function emit_types(io::IO, enums, structs)
   for decl in enums
     println(io, '\n', decl)
@@ -435,10 +487,11 @@ end
 
 function emit_shaders(io::IO, shaders)
   for shader in shaders
-    emit_shader(io, shader)
-    emit_program(io, shader)
-    # XXX: emit_interface
-    # XXX: emit_invocation_data
+    grouped_stages = group_shader_stages(shader)
+    emit_shader(io, shader, grouped_stages)
+    emit_program(io, shader, grouped_stages)
+    emit_interface(io, shader, grouped_stages)
+    emit_user_data(io, shader, grouped_stages)
     # XXX: emit_resource_dependencies
   end
 end
@@ -454,34 +507,22 @@ function name_for_shader_stage_function(shader::XMLShader, stage)
   Symbol(base, '_', stage)
 end
 
-function emit_shader(io::IO, shader::XMLShader)
+function emit_shader(io::IO, shader::XMLShader, grouped_stages)
   # TODO: Define `ShaderLibrary.Shader`.
   type = :(struct $(name_for_shader_struct(shader)) <: Shader end)
   println(io, '\n', process_line_number_nodes(type))
 
-  stages = group_shader_stages(shader)
-  extracted_data_categories = Set(DataCategory[])
+  (; vertex_data_types, primitive_data_types) = interface_data_types(shader, grouped_stages)
+  parameter_data_types = parameter_data_types_for_shader(shader)
 
-  for (stage_name, vec) in pairs(stages)
-    fname = name_for_shader_stage_function(shader, stage_name)
+  for (stage_name, stages) in pairs(grouped_stages)
     args = Expr[]
-    body = Expr[]
+    body = Union{Expr,Comment}[]
 
     inputs = Dictionary{XMLShaderStageInput,Symbol}()
     outputs = Dictionary{XMLShaderStageOutput,Symbol}()
-    vertex_data_types = Union{Symbol, Expr}[]
-    primitive_data_types = Union{Symbol, Expr}[]
-    invocation_data_types = Union{Symbol, Expr}[]
     # TODO: add descriptors
-    for (component, stage) in vec
-      for data in stage.data
-        @trymatch data.category begin
-          &DATA_CATEGORY_VERTEX_DATA => push!(vertex_data_types, data.type)
-          &DATA_CATEGORY_PRIMITIVE_DATA => push!(primitive_data_types, data.type)
-          &DATA_CATEGORY_INVOCATION_DATA => push!(primitive_data_types, data.type)
-        end
-      end
-
+    for (component, stage) in stages
       for output in stage.outputs
         haskey(outputs, output) && continue
         insert!(outputs, output, output.name)
@@ -496,19 +537,22 @@ function emit_shader(io::IO, shader::XMLShader)
     end
 
     variable, source, vertex_data_type = aggregate_data(vertex_data_types, DATA_CATEGORY_VERTEX_DATA)
-    !isnothing(source) && push!(body, :($variable = $source))
+    source !== nothing && push!(body, :($variable = $source))
     variable, source, primitive_data_type = aggregate_data(primitive_data_types, DATA_CATEGORY_PRIMITIVE_DATA)
-    !isnothing(source) && push!(body, :($variable = $source))
-    variable, source, invocation_data_type = aggregate_data(invocation_data_types, DATA_CATEGORY_INVOCATION_DATA)
-    !isnothing(source) && push!(body, :($variable = $source))
+    source !== nothing && push!(body, :($variable = $source))
+    variable, source, parameter_data_type = aggregate_data(parameter_data_types, DATA_CATEGORY_PARAMETER)
+    source !== nothing && push!(body, :($variable = $source))
 
     vertex_outputs = Set(output.name for output in keys(outputs) if output.vertex_output)
-
-    for (i, (component, stage)) in enumerate(vec)
+    assigned_data_variables = Dictionary{Symbol, XMLShaderStageData}()
+    for (i, (component, stage)) in enumerate(stages)
+      INSERT_COMMENTS[] && push!(body, Comment(component.name))
       for data in stage.data
-        in(data.category, extracted_data_categories) && continue
-        push!(extracted_data_categories, data.category)
-        extract_data!(body, data, vertex_data_type, in(data.name, vertex_outputs), primitive_data_type, invocation_data_type, i)
+        is_vertex_output = in(data.name, vertex_outputs)
+        previous = get(assigned_data_variables, data.name, nothing)
+        previous !== nothing && data.type == previous.type && data.category == previous.category && continue
+        extract_data!(body, shader, component, data, vertex_data_type, is_vertex_output, primitive_data_type, parameter_data_type, i)
+        set!(assigned_data_variables, data.name, data)
       end
 
       isdefined(stage, :code) && push!(body, stage.code)
@@ -521,29 +565,28 @@ function emit_shader(io::IO, shader::XMLShader)
     end
     push!(args, :((; data)::PhysicalRef{InvocationData}))
 
-    ex = :(function $fname($(args...)) end)
+    ex = :(function $(name_for_shader_stage_function(shader, stage_name))($(args...)) end)
     append!(ex.args[2].args, body)
     println(io, '\n', process_line_number_nodes(ex))
   end
 end
 
-function emit_program(io::IO, shader::XMLShader)
+function emit_program(io::IO, shader::XMLShader, grouped_stages)
   T = name_for_shader_struct(shader)
-  stages = group_shader_stages(shader)
   variables = Symbol[]
   shaders = Expr[]
-  for (stage_name, vec) in pairs(stages)
+  for (stage_name, stages) in pairs(grouped_stages)
     inputs = Dictionary{XMLShaderStageInput,Symbol}()
     outputs = Dictionary{XMLShaderStageOutput,Symbol}()
     args = Expr[]
-    for (component, stage) in vec
+    for (component, stage) in stages
       for output in stage.outputs
         haskey(outputs, output) && continue
         insert!(outputs, output, output.name)
         push!(args, :(::Mutable{$(output.type)}::Output))
       end
     end
-    for (component, stage) in vec
+    for (component, stage) in stages
       for input in stage.inputs
         haskey(inputs, input) && continue
         insert!(inputs, input, input.name)
@@ -566,6 +609,67 @@ function emit_program(io::IO, shader::XMLShader)
   println(io, '\n', process_line_number_nodes(ex))
 end
 
+function interface_data_types(shader::XMLShader, grouped_stages)
+  vertex_data_types = Union{Symbol, Expr}[]
+  primitive_data_types = Union{Symbol, Expr}[]
+  instance_data_types = Union{Symbol, Expr}[]
+  names = Symbol[]
+  for (stage_name, stages) in pairs(grouped_stages)
+    for (component, stage) in stages
+      for data in stage.data
+        in(data.name, names) && continue
+        push!(names, data.name)
+        @trymatch data.category begin
+          &DATA_CATEGORY_VERTEX_DATA => push!(vertex_data_types, data.type)
+          &DATA_CATEGORY_PRIMITIVE_DATA => push!(primitive_data_types, data.type)
+          &DATA_CATEGORY_INSTANCE_DATA => push!(instance_data_types, data.type)
+        end
+      end
+    end
+  end
+  return (; vertex_data_types, primitive_data_types, instance_data_types)
+end
+
+function parameter_data_types_for_shader(shader::XMLShader)
+  parameter_data_types = Union{Symbol, Expr}[]
+  for data in shader.arguments
+    data.category === DATA_CATEGORY_PARAMETER || continue
+    if isvector(data.type)
+      eltype = vector_eltype(data.type)
+      push!(parameter_data_types, :(PhysicalBuffer{$eltype}))
+    else
+      push!(parameter_data_types, data.type)
+    end
+  end
+  return parameter_data_types
+end
+
+function emit_interface(io::IO, shader::XMLShader, grouped_stages)
+  (; vertex_data_types, primitive_data_types) = interface_data_types(shader, grouped_stages)
+  vertex_data_type = type_or_tuple_type_or_nothing(vertex_data_types)
+  primitive_data_type = type_or_tuple_type_or_nothing(primitive_data_types)
+  instance_data_type = :Nothing
+  interface = Expr(:(=), :(interface(::$(name_for_shader_struct(shader)))), :(Tuple{$vertex_data_type, $primitive_data_type, $instance_data_type}))
+  println(io, process_line_number_nodes(interface))
+end
+
+function emit_user_data(io::IO, shader::XMLShader, grouped_stages)
+  parameter_data_types = parameter_data_types_for_shader(shader)
+  parameter_data_type = type_or_tuple_type_or_nothing(parameter_data_types)
+  values = Any[]
+  for data in shader.arguments
+    field = :(shader.$(data.name))
+    if isvector(data.type)
+      push!(values, :(instantiate($field, ctx)))
+    else
+      push!(values, field)
+    end
+  end
+  value = isempty(values) ? nothing : length(values) == 1 ? values[] : Expr(:tuple, values...)
+  ex = Expr(:(=), :(user_data(shader::$(name_for_shader_struct(shader)), ctx)), :($value::$parameter_data_type))
+  println(io, process_line_number_nodes(ex))
+end
+
 function group_shader_stages(shader::XMLShader)
   stages = Dictionary{Symbol, Vector{Pair{XMLShaderComponent, XMLShaderStage}}}()
   for component in shader.components
@@ -577,12 +681,14 @@ function group_shader_stages(shader::XMLShader)
   stages
 end
 
-function extract_data!(body::Vector{Expr},
+function extract_data!(body::Vector{Union{Expr,Comment}},
+                       shader::XMLShader,
+                       component::XMLShaderComponent,
                        data::XMLShaderStageData,
                        vertex_data_type::Optional{Union{Symbol, Expr}},
                        is_vertex_output::Bool,
                        primitive_data_type::Optional{Union{Symbol, Expr}},
-                       invocation_data_type::Optional{Union{Symbol, Expr}},
+                       parameter_data_type::Optional{Union{Symbol, Expr}},
                        i::Int)
   @tryswitch data.category begin
     @case &DATA_CATEGORY_CAMERA
@@ -603,12 +709,28 @@ function extract_data!(body::Vector{Expr},
     @case &DATA_CATEGORY_PRIMITIVE_DATA
     value = data.type === primitive_data_type ? :primitive_data : :(primitive_data[$i * U])
     push!(body, :($(data.name) = $value))
+
+    @case &DATA_CATEGORY_PARAMETER
+    i = findfirst(x -> x.name == data.name && x.type == data.type, shader.arguments)
+
+    if i === nothing
+      data.default !== nothing || error("A parameter without a default value is missing a matching data entry in the shader $(shader.name)")
+      value = data.default.value
+    else
+      value = data.type === parameter_data_type ? :parameter_data : :(parameter_data[$i * U])
+    end
+    push!(body, :($(data.name) = $value))
   end
 end
 
+isvector(type) = isexpr(type, :curly, 2) && type.args[1] === :Vector
+vector_eltype(type) = type.args[2]
+type_or_tuple_type(types) = length(types) == 1 ? types[1] : :(Tuple{$(types...)})
+type_or_tuple_type_or_nothing(types) = isempty(types) ? :Nothing : type_or_tuple_type(types)
+
 function aggregate_data(types, category::DataCategory)
   isempty(types) && return (nothing, nothing, nothing)
-  type = length(types) == 1 ? types[1] : :(Tuple{$(types...)})
+  type = type_or_tuple_type(types)
   @switch category begin
     @case &DATA_CATEGORY_PRIMITIVE_DATA
     variable = :primitive_data
@@ -618,8 +740,8 @@ function aggregate_data(types, category::DataCategory)
     variable = :vertex_data
     source = :(@load data.vertex_data[VertexIndex + 1U]::$type)
 
-    @case &DATA_CATEGORY_INVOCATION_DATA
-    variable = :invocation_data
+    @case &DATA_CATEGORY_PARAMETER
+    variable = :parameter_data
     source = :(@load data.user_data::$type)
   end
   (variable, source, type)

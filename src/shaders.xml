@@ -1,36 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <shaders>
   <shader name="sprite">
+    <data name="uv"/>
+    <data name="texture"/>
     <component name="camera-projection"/>
-    <component name="uv-vertex">
-      <data name="uv"/>
-    </component>
-    <component name="sprite">
-      <data name="texture"/>
-    </component>
+    <component name="uv-vertex"/>
+    <component name="sprite"/>
   </shader>
 
   <shader name="quadratic-bezier-fill">
+    <data name="uv"/>
+    <data name="curves"/>
+    <data name="fill_info"/>
     <component name="camera-projection"/>
-    <component name="uv-vertex">
-      <data name="uv"/>
-    </component>
-    <component name="quadratic-bezier-fill">
-      <data name="curves"/>
-      <data name="primitive_data"/>
-    </component>
+    <component name="uv-vertex"/>
+    <component name="quadratic-bezier-fill"/>
   </shader>
 
   <shader name="pbr">
+    <data name="bsdf"/>
+    <data name="lights"/>
+    <data name="probes"/>
     <component name="camera-projection"/>
-    <component name="pbr-light">
-      <data name="bsdf"/>
-      <data name="lights"/>
-    </component>
-    <component name="pbr-probe">
-      <data name="bsdf"/>
-      <data name="probes"/>
-    </component>
+    <component name="pbr-light"/>
+    <component name="pbr-probe"/>
     <component name="tone-mapping"/>
     <component name="gamma-correction"/>
   </shader>

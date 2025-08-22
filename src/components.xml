@@ -87,10 +87,10 @@
   <shader-component name="quadratic-bezier-fill">
     <fragment>
       <data name="curves" type="Vector{Arr{3, Vec2}}"/>
-      <data name="primitive_data" type="QuadraticBezierPrimitiveData" category="primitive-data"/>
+      <data name="fill_info" type="FillInfo" category="primitive-data"/>
       <output builtin="FragCoord"/>
       <code>
-        (; color, range, sharpness) = primitive_data
+        (; color, range, sharpness) = fill_info
         curves_start = DeviceAddress(UInt64(curves) + 24*(first(range) - 1U))
         curves = PhysicalBuffer{Arr{3,Vec2}}(length(range), curves_start)
         FragCoord.rgb = color
@@ -105,7 +105,7 @@
       <output name="position" category="vertex-location"/>
     </vertex>
     <fragment>
-      <input name="normal"/>
+      <input name="normal"/> <!-- <input name="normal" category="vertex-normal"> -->
       <input name="position"/>
       <data name="camera" category="camera"/>
       <data name="bsdf" type="BSDF"/>
@@ -134,7 +134,7 @@
   </shader-component>
 
   <types>
-    <struct name="QuadraticBezierPrimitiveData">
+    <struct name="FillInfo">
       <member name="range" type="UnitRange{UInt32}"/>
       <member name="sharpness" type="Float32"/>
       <member name="color" type="Vec3"/>
