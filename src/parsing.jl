@@ -1,14 +1,5 @@
 using EzXML: EzXML, parsexml, readxml, Document
 
-function strip_linenums!(ex)
-  !Meta.isexpr(ex, :macrocall) && return Base.remove_linenums!(ex)
-  ex.args[2] = nothing
-  for arg in @view ex.args[3:end]
-    strip_linenums!(arg)
-  end
-  ex
-end
-
 struct InvalidXML <: Exception
   msg::String
 end
@@ -344,7 +335,7 @@ function parse_shader_components(xml::Document)
           push!(stage.outputs, XMLShaderStageOutput(dname, type, export_name, vertex_output, interpolation, nothing))
         elseif dtype === :code
           decl === last(decls) || error_invalid_xml("the <code> attribute must come last: $decl")
-          block = strip_linenums!(Meta.parse("begin $(decl.content) end"))
+          block = striplines(Meta.parse("begin $(decl.content) end"))
           code = isexpr(block, :block, 1) ? block.args[1] : Expr(:let, Expr(:block), block)
           stage.code = code
         end
