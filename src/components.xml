@@ -5,7 +5,7 @@
       <data name="data" type="InvocationData" category="invocation-data"/>
       <data name="position" type="Vec3" category="vertex-location"/>
       <output builtin="Position"/>
-      <code> Position.xyz = world_to_coordinates(position, data) </code>
+      <code> @swizzle Position.xyz = world_to_screen_coordinates(position, data) </code>
     </vertex>
   </shader-component>
 
@@ -22,14 +22,14 @@
     <fragment>
       <input name="color"/>
       <output builtin="FragCoord"/>
-      <code> FragCoord.rgb = in_color </code>
+      <code> @swizzle FragCoord.rgb = in_color </code>
     </fragment>
   </shader-component>
 
   <shader-component name="tone-mapping">
     <fragment>
       <output builtin="FragCoord"/>
-      <code> FragCoord.rgb = hdr_tone_mapping(FragCoord.rgb) </code>
+      <code> @swizzle FragCoord.rgb = hdr_tone_mapping(FragCoord.rgb) </code>
     </fragment>
   </shader-component>
 
@@ -37,7 +37,7 @@
     <fragment>
       <data name="γ" type="Float32" default="2.2"/>
       <output builtin="FragCoord"/>
-      <code> FragCoord.rgb = gamma_corrected(FragCoord.rgb, γ) </code>
+      <code> @swizzle FragCoord.rgb = gamma_corrected(FragCoord.rgb, γ) </code>
     </fragment>
     <!-- <compute>
       <data name="γ" type="Float32" default="2.2"/>
@@ -93,8 +93,8 @@
         (; color, range, sharpness) = fill_info
         curves_start = DeviceAddress(UInt64(curves) + 24*(first(range) - 1U))
         curves = PhysicalBuffer{Arr{3,Vec2}}(length(range), curves_start)
-        FragCoord.rgb = color
-        FragCoord.a = clamp(intensity(uv, curves, range, 10sharpness), 0F, 1F)
+        @swizzle FragCoord.rgb = color
+        @swizzle FragCoord.a = clamp(intensity(uv, curves, range, 10sharpness), 0F, 1F)
       </code>
     </fragment>
   </shader-component>
@@ -111,7 +111,7 @@
       <data name="bsdf" type="BSDF"/>
       <data name="lights" type="Vector{Light}"/>
       <code>
-        FragCoord.rgb += compute_lighting_from_sources(bsdf, lights, position, normal, camera)
+        @swizzle FragCoord.rgb += compute_lighting_from_sources(bsdf, lights, position, normal, camera)
       </code>
     </fragment>
   </shader-component>
@@ -128,7 +128,7 @@
       <data name="bsdf" type="BSDF"/>
       <data name="probes" type="Vector{LightProbe}"/>
       <code>
-        FragCoord.rgb += compute_lighting_from_probes(bsdf, probes, position, normal, camera)
+        @swizzle FragCoord.rgb += compute_lighting_from_probes(bsdf, probes, position, normal, camera)
       </code>
     </fragment>
   </shader-component>
