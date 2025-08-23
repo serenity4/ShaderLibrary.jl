@@ -488,6 +488,8 @@ end
 function emit_shaders(io::IO, shaders)
   for shader in shaders
     grouped_stages = group_shader_stages(shader)
+    println(io)
+    emit_shader_struct(io, shader)
     emit_shader(io, shader, grouped_stages)
     emit_program(io, shader, grouped_stages)
     emit_interface(io, shader, grouped_stages)
@@ -507,11 +509,18 @@ function name_for_shader_stage_function(shader::XMLShader, stage)
   Symbol(base, '_', stage)
 end
 
-function emit_shader(io::IO, shader::XMLShader, grouped_stages)
+function emit_shader_struct(io::IO, shader::XMLShader)
   # TODO: Define `ShaderLibrary.Shader`.
-  type = :(struct $(name_for_shader_struct(shader)) <: Shader end)
-  println(io, '\n', process_line_number_nodes(type))
+  fields = Expr[]
+  for data in shader.arguments
+    (; name, type) = data
+    push!(fields, :($name::$type))
+  end
+  type = :(struct $(name_for_shader_struct(shader)) <: Shader; $(fields...); end)
+  println(io, process_line_number_nodes(type))
+end
 
+function emit_shader(io::IO, shader::XMLShader, grouped_stages)
   (; vertex_data_types, primitive_data_types) = interface_data_types(shader, grouped_stages)
   parameter_data_types = parameter_data_types_for_shader(shader)
 
