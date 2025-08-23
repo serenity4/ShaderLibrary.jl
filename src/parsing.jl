@@ -35,42 +35,55 @@ end
   isa(type, Symbol) || isa(type, Expr) || error_invalid_xml("type `$type` is not a valid Julia type; a symbol or expression input is expected")
 end
 
-function parse_types(xml::Document)
-  enums = Expr[]
+struct XMLEnumType
+  name::Symbol
+  type::Union{Symbol,Expr}
+  members::Dictionary{Symbol,Any}
+end
+
+struct XMLStructType
+  name::Symbol
+  members::Dictionary{Symbol,Union{Symbol,Expr}}
+end
+
+function parse_enums(xml::Document)
+  enums = Dictionary{Symbol,XMLEnumType}()
   for decl in findall("/shader-components/types/enum", xml)
-    ename = getattr(decl, "name"; symbol = true)
-    isnothing(ename) && error_invalid_xml("missing name for enum: $decl")
+    name = getattr(decl, "name"; symbol = true)
+    isnothing(name) && error_invalid_xml("missing name for enum: $decl")
     type = parse_type(decl)
     isnothing(type) && error_invalid_xml("missing type for enum: $decl")
-    members = Expr[]
+    members = Dictionary{Symbol,Any}()
     for member in findall("./member", decl)
-      name = getattr(member, "name"; symbol = true)
-      isnothing(name) && error_invalid_xml("missing name for enum member: $member")
+      mname = getattr(member, "name"; symbol = true)
+      isnothing(mname) && error_invalid_xml("missing name for enum member: $member")
       value = getattr(member, "value"; parse = true)
       isnothing(value) && error_invalid_xml("missing value for enum member: $member")
-      push!(members, :($name = $value))
+      insert!(members, mname, value)
     end
     isempty(members) && error_invalid_xml("no members defined for enum: $decl")
-    push!(enums, strip_linenums!(:(@enum $ename::$type begin $(members...) end)))
+    insert!(enums, name, XMLEnumType(name, type, members))
   end
+  return enums
+end
 
-  structs = Expr[]
+function parse_structs(xml::Document)
+  structs = Dictionary{Symbol,XMLStructType}()
   for decl in findall("/shader-components/types/struct", xml)
-    sname = getattr(decl, "name"; symbol = true)
-    isnothing(sname) && error_invalid_xml("missing name for struct: $decl")
-    members = Expr[]
+    name = getattr(decl, "name"; symbol = true)
+    isnothing(name) && error_invalid_xml("missing name for struct: $decl")
+    members = Dictionary{Symbol,Union{Symbol,Expr}}()
     for member in findall("./member", decl)
-      name = getattr(member, "name"; symbol = true)
-      isnothing(name) && error_invalid_xml("missing name for struct member: $member")
+      mname = getattr(member, "name"; symbol = true)
+      isnothing(mname) && error_invalid_xml("missing name for struct member: $member")
       type = parse_type(member)
       isnothing(type) && error_invalid_xml("missing type for struct member: $member")
-      push!(members, :($name::$type))
+      insert!(members, mname, type)
     end
     isempty(members) && error_invalid_xml("no members defined for struct: $decl")
-    push!(structs, strip_linenums!(:(struct $sname; $(members...) end)))
+    insert!(structs, name, XMLStructType(name, members))
   end
-
-  enums, structs
+  return structs
 end
 
 struct XMLShaderStageOutput
@@ -149,7 +162,6 @@ mutable struct XMLShaderStage
   code::Expr
   XMLShaderStage(name) = new(name, [], [], [], [], [], [], [], [], [], [], [])
 end
-
 
 struct XMLShaderComponent
   name::Symbol
@@ -476,16 +488,30 @@ end
 
 Base.show(io::IO, comment::Comment) = print(io, "# ", comment.msg)
 
-function emit_types(io::IO, enums, structs)
-  for decl in enums
-    println(io, '\n', decl)
+function emit_enum(io::IO, enum::XMLEnumType)
+  members = Expr[:($name = $value) for (name, value) in pairs(enum.members)]
+  ex = (:(@enum $(enum.name)::$(enum.type) begin; $(members...); end))
+  println(io, process_line_number_nodes(ex))
+end
+
+function emit_struct(io::IO, type::XMLStructType)
+  members = Expr[:($name::$value) for (name, value) in pairs(type.members)]
+  ex = (:(struct $(type.name); $(members...); end))
+  println(io, process_line_number_nodes(ex))
+end
+
+function emit_types(io::IO, enums::Dictionary{Symbol,XMLEnumType}, structs::Dictionary{Symbol,XMLStructType})
+  for enum in enums
+    println(io)
+    emit_enum(io, enum)
   end
-  for decl in structs
-    println(io, '\n', decl)
+  for type in structs
+    println(io)
+    emit_struct(io, type)
   end
 end
 
-function emit_shaders(io::IO, shaders)
+function emit_shaders(io::IO, shaders::Vector{XMLShader}, structs::Dictionary{Symbol,XMLStructType})
   for shader in shaders
     grouped_stages = group_shader_stages(shader)
     println(io)
@@ -494,7 +520,7 @@ function emit_shaders(io::IO, shaders)
     emit_program(io, shader, grouped_stages)
     emit_interface(io, shader, grouped_stages)
     emit_user_data(io, shader, grouped_stages)
-    # XXX: emit_resource_dependencies
+    emit_resource_dependencies(io, shader, structs, grouped_stages)
   end
 end
 
@@ -679,6 +705,42 @@ function emit_user_data(io::IO, shader::XMLShader, grouped_stages)
   println(io, process_line_number_nodes(ex))
 end
 
+function emit_resource_dependencies(io::IO, shader::XMLShader, structs::Dictionary{Symbol,XMLStructType}, grouped_stages)
+  body = Expr[]
+  for data in shader.arguments
+    ex = insert_resource_dependencies(data.name, data.type, :(shader.$(data.name)), structs)
+    ex === nothing && continue
+    isa(ex, Expr) ? push!(body, ex) : append!(body, ex)
+  end
+  isempty(body) && return # no need to define a method
+  pushfirst!(body, :(dependencies = Dictionary{Resource,ResourceDependency}()))
+  ex = :(function resource_dependencies(shader::$(name_for_shader_struct(shader))); $(body...); end)
+  println(io, process_line_number_nodes(ex))
+end
+
+function insert_resource_dependencies(name, type, value, structs, depth = 0)
+  if isvector(type)
+    variable = Symbol('a' + depth)
+    inner = insert_resource_dependencies(name, vector_eltype(type), variable, structs, depth + 1)
+    inner === nothing && return nothing
+    inners = isa(inner, Expr) ? (inner,) : inner
+    isempty(inners) && return nothing
+    return :(for $variable in $value; $(inners...); end)
+  elseif type === :Texture
+    dependency = :(ResourceDependency(RESOURCE_USAGE_TEXTURE, READ, nothing, nothing))
+    return :(insert!(dependencies, $value, $dependency))
+  elseif haskey(structs, type)
+    (; members) = structs[type]
+    exs = Expr[]
+    for (mname, mtype) in pairs(members)
+      inner = insert_resource_dependencies(mname, mtype, :($value.$mname), structs)
+      inner === nothing && continue
+      isa(inner, Expr) ? push!(exs, inner) : append!(exs, inner)
+    end
+    return exs
+  end
+end
+
 function group_shader_stages(shader::XMLShader)
   stages = Dictionary{Symbol, Vector{Pair{XMLShaderComponent, XMLShaderStage}}}()
   for component in shader.components
@@ -763,7 +825,8 @@ xmldocument(xml::Document) = xml
 generate_shaders(components, shaders) = generate_shaders(xmldocument(components), xmldocument(shaders))
 
 function generate_shaders(components::Document, shaders::Document)
-  enums, structs = parse_types(components)
+  enums = parse_enums(components)
+  structs = parse_structs(components)
   components = parse_shader_components(components)
   shaders = parse_shaders(shaders, components)
   (; enums, structs, components, shaders)
@@ -779,6 +842,6 @@ function generate_shaders(io::IO, components, shaders)
   (; enums, structs, components, shaders) = generate_shaders(components, shaders)
   println(io, "# This file was generated with ShaderLibrary.jl")
   emit_types(io, enums, structs)
-  emit_shaders(io, shaders)
+  emit_shaders(io, shaders, structs)
   println(io)
 end
