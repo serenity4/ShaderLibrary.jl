@@ -7,8 +7,7 @@
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
     @test_throws "At least one color attachment" Command(grad, ShaderParameters(), device, primitive)
     command = Command(grad, parameters, device, primitive)
-    render(device, command)
-    data = collect(color, device)
+    data = render_graphics(device, command)
     save_test_render("triangle.png", data, 0xe13e13a928971a82)
 
     # This time, specify vertex locations in pixels.
@@ -16,8 +15,7 @@
     mesh = VertexMesh(1:3, vertex_locations; vertex_data)
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
     command = Command(grad, (@set parameters.unit = UNIT_PIXEL), device, primitive)
-    render(device, command)
-    data = collect(color, device)
+    data = render_graphics(device, command)
     save_test_render("small_triangle.png", data, 0xd2a6f09f2469722f)
   end
 
@@ -25,8 +23,7 @@
     grad = Gradient()
     rect = Rectangle(Vec2(0.5, 0.5), fill(Vec3(1.0, 0.0, 1.0), 4), nothing) # actually a square
     primitive = Primitive(rect, Vec2(-0.4, -0.4))
-    render(device, grad, parameters, primitive)
-    data = collect(color, device)
+    data = render_graphics(device, grad, parameters, primitive)
     save_test_render("rectangle.png", data, 0x79bb773f3f4ca5e1)
   end
 
@@ -39,16 +36,13 @@
     shader = let center = @swizzle primitive.transform.translation.vec.xy
       FragmentLocationTest(p -> norm(p - center) < 0.4)
     end
-    render(device, shader, shader_parameters, primitive)
-    data = collect(depth, device)
+    data = render_graphics(device, depth, shader, shader_parameters, primitive)
     @test data[1] === 0.4f0
     @test data[700, 800] === 0.01f0
     @test 140000 < count(x -> x === 0.01f0, data) < 150000
-    render(device, FragmentLocationTest(p -> false), shader_parameters, primitive)
-    data = collect(depth, device)
+    data = render_graphics(device, depth, FragmentLocationTest(p -> false), shader_parameters, primitive)
     @test all(x -> x === 0.4f0, data)
-    render(device, FragmentLocationTest(Returns(true)), shader_parameters, primitive)
-    data = collect(depth, device)
+    data = render_graphics(device, depth, FragmentLocationTest(Returns(true)), shader_parameters, primitive)
     @test count(x -> x === 0.01f0, data) > 290000
 
     # Do the same but using a stencil this time.
@@ -57,16 +51,13 @@
     shader_parameters = setproperties(parameters, (; color = [color_one_sample], stencil, stencil_clear = 0x00))
     @reset shader_parameters.render_state.enable_stencil_testing = true
     @reset shader_parameters.render_state.stencil_front.pass_op = Vk.STENCIL_OP_REPLACE
-    render(device, shader, shader_parameters, primitive)
-    data = collect(stencil, device)
+    data = render_graphics(device, stencil, shader, shader_parameters, primitive)
     @test data[1] === 0x00
     @test data[700, 800] === 0x01
     @test 140000 < count(x -> x === 0x01, data) < 150000
-    render(device, FragmentLocationTest(p -> false), shader_parameters, primitive)
-    data = collect(stencil, device)
+    data = render_graphics(device, stencil, FragmentLocationTest(p -> false), shader_parameters, primitive)
     @test all(x -> x === 0x00, data)
-    render(device, FragmentLocationTest(Returns(true)), shader_parameters, primitive)
-    data = collect(stencil, device)
+    data = render_graphics(device, stencil, FragmentLocationTest(Returns(true)), shader_parameters, primitive)
     @test count(x -> x === 0x01, data) > 290000
 
     # And then with a combined depth/stencil attachment.
@@ -101,8 +92,7 @@
     mesh = VertexMesh(1:3, vertex_locations; vertex_data = uvs)
     sprite = Sprite(texture)
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
-    render(device, sprite, parameters, primitive)
-    data = collect(color, device)
+    data = render_graphics(device, sprite, parameters, primitive)
     save_test_render("sprite_triangle.png", data, 0x836d666543dc2f87)
 
     texture = image_resource(device, read_texture("normal.png"); usage_flags = Vk.IMAGE_USAGE_SAMPLED_BIT)
@@ -110,8 +100,7 @@
     rect = Rectangle(Point2(0.5, 0.5), uvs, nothing)
     sprite = Sprite(texture)
     primitive = Primitive(rect)
-    render(device, sprite, parameters, primitive)
-    data = collect(color, device)
+    data = render_graphics(device, sprite, parameters, primitive)
     save_test_render("sprite_rectangle.png", data, 0x83c64ebd09e13704)
   end
 
@@ -123,19 +112,16 @@
     primitive = Primitive(mesh, FACE_ORIENTATION_COUNTERCLOCKWISE)
 
     directional_blur = GaussianBlurDirectional(texture, BLUR_HORIZONTAL, 0.02)
-    render(device, directional_blur, parameters, primitive)
-    data = collect(color, device)
+    data = render_graphics(device, color, directional_blur, parameters, primitive)
     save_test_render("blurred_triangle_horizontal.png", data, 0x0676ff22a882d5f1)
 
     directional_blur = GaussianBlurDirectional(texture, BLUR_VERTICAL, 0.02)
-    render(device, directional_blur, parameters, primitive)
-    data = collect(color, device)
+    data = render_graphics(device, color, directional_blur, parameters, primitive)
     save_test_render("blurred_triangle_vertical.png", data, 0xb38fadbdbc250416)
 
     # Need to specify dimensions of the whole texture for the first pass.
     blur = GaussianBlur(texture, 0.02)
-    render(device, blur, parameters, primitive)
-    data = collect(color, device)
+    data = render_graphics(device, color, blur, parameters, primitive)
     save_test_render("blurred_triangle.png", data, 0xc980df4399b8e477)
   end
 
@@ -186,8 +172,7 @@
     uvs = Vec2[(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)]
     rect = Rectangle(Vec2(0.5, 0.5), uvs, data)
     primitive = Primitive(rect)
-    render(device, qbf, parameters, primitive)
-    data = collect(color, device)
+    data = render_graphics(device, qbf, parameters, primitive)
     save_test_render("glyph.png", data, 0x09f925148855e2bc)
 
     font = OpenTypeFont(font_file("juliamono-regular.ttf"));
@@ -198,8 +183,7 @@
     vertex_data = Vec2[(0, 0), (550, 0), (0, 550), (550, 550)]
     rect = Rectangle(Vec2(0.5, 0.5), vertex_data, data)
     primitive = Primitive(rect)
-    render(device, qbf, parameters, primitive)
-    data = collect(color, device)
+    data = render_graphics(device, qbf, parameters, primitive)
     save_test_render("glyph_unnormalized.png", data, 0x0b7ae4fb246f7a73; keep = false)
   end
 
@@ -218,21 +202,24 @@
     parameters_ssaa = @set parameters.render_state.enable_fragment_supersampling = true
 
     text = OpenType.Text("The brown fox jumps over the lazy dog.", TextOptions())
-    render(device, Text(text, font, options), parameters_ssaa, (-1, 0))
-    data = collect(color, device)
+    data = render_graphics(device, Text(text, font, options), parameters_ssaa, (-1, 0))
     save_test_render("text.png", data, 0x8aa232d949de880a)
 
     text = OpenType.Text(styled"The{background=red: }{color=brown:brown} {underline:fo{size=$(30px):x}}{size=$(108px): {background=orange:jumps} {cyan:over} }the {color=purple:{strikethrough:l{size=$(100px),color=#ff000022:a}zy} beautiful} dog.", TextOptions())
-    render(device, Text(text, font, options), parameters_ssaa, (-1.7, 0))
-    data = collect(color, device)
+    data = render_graphics(device, Text(text, font, options), parameters_ssaa, (-1.7, 0))
     save_test_render("text_rich.png", data, 0x437beaa5bbfc1896)
 
     font = OpenTypeFont(font_file("NotoSerifLao.ttf"));
     options = FontOptions(ShapingOptions(tag"lao ", tag"dflt"; enabled_features = Set([tag"aalt"])), 200px)
     text = OpenType.Text("ກີບ ສົ \ue99\ueb5\uec9", TextOptions())
-    render(device, Text(text, font, options), parameters_ssaa, (-1, 0))
-    data = collect(color, device)
+    data = render_graphics(device, Text(text, font, options), parameters_ssaa, (-1, 0))
     save_test_render("text_lao.png", data, 0xead7f7a2819b944f)
+
+    font = OpenTypeFont(font_file("juliamono-regular.ttf"));
+    options = FontOptions(ShapingOptions(tag"latn", tag"fra "), 48px)
+    text = OpenType.Text(styled"The{background=red: }{color=brown:brown} {underline:fo{size=$(30px):x}}{size=$(108px): {background=orange:jumps} {cyan:over} }\nthe {color=purple:{strikethrough:l{size=$(100px),color=#ff000022:a}zy} beautiful} dog.", TextOptions())
+    data = render_graphics(device, Text(text, font, options), parameters_ssaa, (-1.7, 0))
+    save_test_render("text_multiline.png", data, 0xf66f60753daba039)
   end
 
   @testset "Meshes" begin
@@ -267,16 +254,14 @@
     grad = Gradient()
     camera = import_camera(gltf)
     cube_parameters = setproperties(parameters, (; camera))
-    render(device, grad, cube_parameters, primitive)
-    data = collect(color, device)
+    data = render_graphics(device, grad, cube_parameters, primitive)
     save_test_render("colored_cube_perspective.png", data, 0xdc62ddd8daf0638c)
     @reset camera.focal_length = 0
     @reset camera.near_clipping_plane = -10
     @reset camera.far_clipping_plane = 10
     @reset camera.extent = (6F, 6F)
     cube_parameters = setproperties(parameters, (; camera))
-    render(device, grad, cube_parameters, primitive)
-    data = collect(color, device)
+    data = render_graphics(device, grad, cube_parameters, primitive)
     save_test_render("colored_cube_orthographic.png", data, 0xa7b8106a1ce942eb)
   end
 end;

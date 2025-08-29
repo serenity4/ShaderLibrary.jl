@@ -79,9 +79,9 @@ function renderables(cache::ProgramCache, blur::GaussianBlur, parameters::Shader
 
   blur_y = GaussianBlurDirectional(transient_image, BLUR_VERTICAL, blur.size)
 
-  (
+  [
     RenderNode(Command(cache, blur_x, transiant_parameters, Primitive(rect)), :directional_blur_x),
     RenderNode(transfer, :transfer),
     RenderNode(Command(cache, blur_y, parameters, geometry), :directional_blur_y),
-  )
+  ]
 end

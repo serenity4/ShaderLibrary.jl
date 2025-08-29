@@ -12,23 +12,29 @@ end
 function renderables(cache::ProgramCache, text::Text, parameters::ShaderParameters, location)
   location = vec3(convert(Vec, location))
   isempty(text.lines) && return Command[]
-  length(text.lines) == 1 || error("Multi-line text is not supported yet")
-  line = text.lines[1]
   background_renders = Command[]
   text_renders = Command[]
-  no_clear = fill(nothing, length(parameters.color))
+  @reset parameters.color_clear = []
+  for line in text.lines
+    render_glyph_backgrounds!(background_renders, line, location, cache, parameters)
+    render_glyphs!(text_renders, line, location, cache, parameters)
+    location += @vec Float32[0, -0.2, 0]
+  end
+  isempty(background_renders) && return text_renders
+  [background_renders, text_renders]
+end
 
-  # Render backgrounds first.
+function render_glyph_backgrounds!(background_renders, line::OpenType.Line, location, cache::ProgramCache, parameters::ShaderParameters)
   for segment in line.segments
     isnothing(segment.style.background) && continue
     (; r, g, b, alpha) = something(segment.style.background, RGBA(1f0, 1f0, 1f0, 1f0))
     color = Vec4(r, g, b, alpha)
     command = Command(cache, Gradient{Vec4}(), parameters, background_decoration(line, segment, location, color))
-    isempty(background_renders) && (parameters = @set parameters.color_clear = no_clear)
     push!(background_renders, command)
   end
+end
 
-  # Then render glyphs.
+function render_glyphs!(text_renders, line::OpenType.Line, location, cache::ProgramCache, parameters::ShaderParameters)
   for segment in line.segments
     has_outlines(line, segment) || continue
     (; r, g, b, alpha) = something(segment.style.color, RGBA(1f0, 1f0, 1f0, 1f0))
@@ -36,14 +42,10 @@ function renderables(cache::ProgramCache, text::Text, parameters::ShaderParamete
     (; position, quads, curves) = glyph_quads(line, segment, location, color)
     qbf = QuadraticBezierFill(curves)
     command = Command(cache, qbf, parameters, quads)
-    isempty(text_renders) && (parameters = @set parameters.color_clear = no_clear)
     push!(text_renders, command)
     segment.style.underline && push!(text_renders, Command(cache, Gradient{Vec4}(), parameters, underline_decoration(line, segment, location, color)))
     segment.style.strikethrough && push!(text_renders, Command(cache, Gradient{Vec4}(), parameters, strikethrough_decoration(line, segment, location, color)))
   end
-
-  isempty(background_renders) && return text_renders
-  [background_renders, text_renders]
 end
 
 function glyph_quads(line::Line, segment::LineSegment, origin::Vec3, color::Vec4)

@@ -19,6 +19,32 @@ function depth_or_stencil_attachment(device, dimensions, format; samples = 1, na
   attachment_resource(device, nothing; name, format, samples, usage_flags = Vk.IMAGE_USAGE_TRANSFER_SRC_BIT | Vk.IMAGE_USAGE_TRANSFER_DST_BIT | Vk.IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, dims = dimensions)
 end
 
+infer_graphics_target(command::Command) = only(command.graphics.targets.color)
+infer_graphics_target(node::RenderNode) = infer_graphics_target(node.commands[begin])
+infer_graphics_target(list::AbstractVector) = infer_graphics_target(list[begin])
+render_graphics(device, nodes) = render_graphics(device, infer_graphics_target(nodes), nodes)
+render_graphics(device, target, shader::ShaderComponent, parameters::ShaderParameters, args...) =
+  render_graphics(device, target, renderables(shader, parameters, device, args...))
+render_graphics(device, shader::ShaderComponent, parameters::ShaderParameters, args...) =
+  render_graphics(device, renderables(shader, parameters, device, args...))
+function render_graphics(device, target, list::AbstractVector{<:AbstractVector{Command}})
+  nodes = RenderNode[]
+  for commands in list
+    push!(nodes, RenderNode(commands))
+  end
+  insert!(nodes[1].clears, target, ShaderLibrary.DEFAULT_CLEAR_VALUE)
+  render_graphics(device, target, nodes)
+end
+function render_graphics(device, color, commands::AbstractVector{Command})
+  node = RenderNode(commands)
+  insert!(node.clears, color, ShaderLibrary.DEFAULT_CLEAR_VALUE)
+  render_graphics(device, color, node)
+end
+function render_graphics(device, color, nodes)
+  render(device, nodes)
+  collect(color, device)
+end
+
 function save_render(path, data)
   mkpath(dirname(path))
   ispath(path) && rm(path)
