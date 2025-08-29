@@ -14,7 +14,7 @@ using Swizzles: @swizzle
 using Lava
 using Lava: Image
 using OpenType
-using OpenType: Line
+using OpenType: Line, TextOptions, segment_height
 using Erosion
 using Erosion: ErosionMaps
 using StructEquality: @struct_hash_equal, @struct_hash_equal_isapprox

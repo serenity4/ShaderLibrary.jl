@@ -192,7 +192,8 @@
     px = pixel_size(parameters)
     options = FontOptions(ShapingOptions(tag"latn", tag"fra "), 48px)
     text = OpenType.Text("The brown fox jumps over the lazy dog.", TextOptions())
-    line = only(lines(text, [font => options]))
+    parsed = OpenType.ParsedText(text, [font => options])
+    line = only(parsed.lines)
     segment = only(line.segments)
     (; quads, curves) = glyph_quads(line, segment, zero(Vec3), Vec4(1, 1, 1, 1))
     @test length(quads) == count(!isspace, text.chars)
@@ -219,7 +220,7 @@
     options = FontOptions(ShapingOptions(tag"latn", tag"fra "), 48px)
     text = OpenType.Text(styled"The{background=red: }{color=brown:brown} {underline:fo{size=$(30px):x}}{size=$(108px): {background=orange:jumps} {cyan:over} }\nthe {color=purple:{strikethrough:l{size=$(100px),color=#ff000022:a}zy} beautiful} dog.", TextOptions())
     data = render_graphics(device, Text(text, font, options), parameters_ssaa, (-1.7, 0))
-    save_test_render("text_multiline.png", data, 0xf66f60753daba039)
+    save_test_render("text_multiline.png", data, 0x8f2b93e8ec403915)
   end
 
   @testset "Meshes" begin

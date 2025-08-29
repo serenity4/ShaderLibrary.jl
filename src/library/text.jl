@@ -1,30 +1,34 @@
 struct Text <: GraphicsShaderComponent
-  lines::Vector{OpenType.Line}
+  parsed::ParsedText
 end
 
 Text(text::OpenType.Text, font::OpenTypeFont, options::OpenType.FontOptions) = Text(text, [font => options])
 
 function Text(text::OpenType.Text, fonts)
-  lines = OpenType.lines(text, fonts)
-  Text(lines)
+  parsed = ParsedText(text, fonts)
+  Text(parsed)
 end
 
 function renderables(cache::ProgramCache, text::Text, parameters::ShaderParameters, location)
+  (; parsed) = text
   location = vec3(convert(Vec, location))
-  isempty(text.lines) && return Command[]
+  isempty(parsed.lines) && return Command[]
   background_renders = Command[]
   text_renders = Command[]
+  # Disable any clears; we have multiple draws so it's probably best for the user to decide when/what to clear.
   @reset parameters.color_clear = []
-  for line in text.lines
+  @reset parameters.depth_clear = nothing
+  @reset parameters.stencil_clear = nothing
+  for (line, spacing) in zip(parsed.lines, parsed.spacings)
+    @reset location.y += Float32(-spacing)
     render_glyph_backgrounds!(background_renders, line, location, cache, parameters)
     render_glyphs!(text_renders, line, location, cache, parameters)
-    location += @vec Float32[0, -0.2, 0]
   end
   isempty(background_renders) && return text_renders
   [background_renders, text_renders]
 end
 
-function render_glyph_backgrounds!(background_renders, line::OpenType.Line, location, cache::ProgramCache, parameters::ShaderParameters)
+function render_glyph_backgrounds!(background_renders, line::Line, location, cache::ProgramCache, parameters::ShaderParameters)
   for segment in line.segments
     isnothing(segment.style.background) && continue
     (; r, g, b, alpha) = something(segment.style.background, RGBA(1f0, 1f0, 1f0, 1f0))
@@ -34,7 +38,7 @@ function render_glyph_backgrounds!(background_renders, line::OpenType.Line, loca
   end
 end
 
-function render_glyphs!(text_renders, line::OpenType.Line, location, cache::ProgramCache, parameters::ShaderParameters)
+function render_glyphs!(text_renders, line::Line, location, cache::ProgramCache, parameters::ShaderParameters)
   for segment in line.segments
     has_outlines(line, segment) || continue
     (; r, g, b, alpha) = something(segment.style.color, RGBA(1f0, 1f0, 1f0, 1f0))
